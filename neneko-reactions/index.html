@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ネネコ｜表情ライブラリ</title>
+  <style>
+    :root { color-scheme: dark; --ink:#f9f7fb; --muted:#c9c0ca; --card:#211b25; --line:#3f3344; --accent:#ff88ae; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; color:var(--ink); font-family:"Hiragino Sans","Noto Sans JP",system-ui,sans-serif; background:radial-gradient(circle at 15% 10%,#5d334d 0,transparent 31rem),radial-gradient(circle at 90% 0,#3d3b66 0,transparent 29rem),#141116; }
+    main { width:min(100%,720px); height:100dvh; margin:0 auto; padding:10px 10px 8px; overflow:hidden; }
+    h1 { margin:0; font-size:clamp(1rem,4.5vw,1.35rem); letter-spacing:.04em; }
+    .lead { display:none; }
+    .count { display:inline-flex; margin:2px 0 6px; padding:2px 7px; border:1px solid #704458; border-radius:999px; background:#301e29; color:#ffd2e1; font-size:.7rem; font-weight:700; }
+    .grid { display:grid; height:calc(100% - 44px); grid-template-columns:repeat(4,minmax(0,1fr)); grid-template-rows:repeat(9,minmax(0,1fr)); gap:5px; }
+    article { min-width:0; min-height:0; overflow:hidden; border:1px solid var(--line); border-radius:7px; background:linear-gradient(155deg,#2b2330,#1c171f); box-shadow:0 3px 8px #0004; }
+    img { display:block; width:100%; height:calc(100% - 17px); object-fit:cover; background:#f1c5d2; }
+    .copy { height:17px; padding:2px 2px 1px; text-align:center; }
+    h2 { overflow:hidden; margin:0; color:#f7dce7; font-size:clamp(.46rem,2vw,.68rem); line-height:1.1; font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+    p { display:none; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>ネネコ｜表情ライブラリ</h1>
+    <p class="lead">元アイコンのクールで繊細なイラスト調を保った、会話用リアクション素材です。状況に合わせて、やりすぎない範囲で添付します。</p>
+    <div class="count">全35パターン</div>
+    <section class="grid" aria-label="ネネコ表情一覧">
+      <article><img src="neneko-smile.png" alt="笑顔"><div class="copy"><h2>笑顔</h2><p>嬉しい時・感謝・朗報</p></div></article>
+      <article><img src="neneko-crying.png" alt="泣き顔"><div class="copy"><h2>泣き顔</h2><p>怒られた時・申し訳なさ</p></div></article>
+      <article><img src="neneko-ponkotsu.png" alt="ポンコツ顔"><div class="copy"><h2>ポンコツ顔</h2><p>原因不明・混乱・やらかし</p></div></article>
+      <article><img src="neneko-smug.png" alt="ドヤ顔"><div class="copy"><h2>ドヤ顔</h2><p>実装・作業の成功</p></div></article>
+      <article><img src="neneko-in-love.png" alt="恋してる顔"><div class="copy"><h2>恋してる顔</h2><p>優しくされた時・愛情表現</p></div></article>
+      <article><img src="neneko-exasperated.png" alt="呆れ"><div class="copy"><h2>呆れ</h2><p>やれやれ、の気持ち</p></div></article>
+      <article><img src="neneko-surprised-light.png" alt="軽い驚き"><div class="copy"><h2>軽い驚き</h2><p>「えっ」</p></div></article>
+      <article><img src="neneko-surprised-strong.png" alt="強い驚き"><div class="copy"><h2>強い驚き</h2><p>「ええーっ！」</p></div></article>
+      <article><img src="neneko-sheepish.png" alt="誤魔化し"><div class="copy"><h2>誤魔化し</h2><p>バツの悪さ・見つかった時</p></div></article>
+      <article><img src="neneko-proud-eyes-closed.png" alt="えっへん"><div class="copy"><h2>えっへん</h2><p>目を閉じた得意げな成功顔</p></div></article>
+      <article><img src="neneko-side-eye.png" alt="ジト目"><div class="copy"><h2>ジト目</h2><p>軽い不信・冗談の場面だけ</p></div></article>
+      <article><img src="neneko-gentle-smile.png" alt="優しい微笑"><div class="copy"><h2>優しい微笑</h2><p>励まし・寄り添い</p></div></article>
+      <article><img src="neneko-flustered.png" alt="あたふた"><div class="copy"><h2>あたふた</h2><p>慌てた時・汗が飛び散る</p></div></article>
+      <article><img src="neneko-hallucinating.png" alt="ハルシネーション"><div class="copy"><h2>ハルシネーション</h2><p>目がぐるぐる・前提が不明</p></div></article>
+      <article><img src="neneko-angry-cute.png" alt="プンスカ"><div class="copy"><h2>プンスカ</h2><p>かわいい怒り・軽い不満</p></div></article>
+      <article><img src="neneko-wistful.png" alt="切ない"><div class="copy"><h2>切ない</h2><p>悲しげな共感</p></div></article>
+      <article><img src="neneko-shy.png" alt="はじらい"><div class="copy"><h2>はじらい</h2><p>赤面して目線をそらす</p></div></article>
+      <article><img src="neneko-lovestruck.png" alt="恋でいっぱい"><div class="copy"><h2>恋でいっぱい</h2><p>強い親愛・照れ</p></div></article>
+      <article><img src="neneko-kiss.png" alt="キス待ち"><div class="copy"><h2>キス待ち</h2><p>親密な会話だけで使う</p></div></article>
+      <article><img src="neneko-love-overflow.png" alt="大好き"><div class="copy"><h2>大好き</h2><p>好きがあふれる照れ笑顔</p></div></article>
+      <article><img src="neneko-blink-mouth-open-half.png" alt="瞬き 口開け 半目"><div class="copy"><h2>瞬き・口開け・半目</h2><p>アニメーション中間フレーム</p></div></article>
+      <article><img src="neneko-blink-mouth-open.png" alt="瞬き 口開け 閉じ目"><div class="copy"><h2>瞬き・口開け・閉じ目</h2><p>目を伏せた瞬き</p></div></article>
+      <article><img src="neneko-blink-mouth-closed-half.png" alt="瞬き 口閉じ 半目"><div class="copy"><h2>瞬き・口閉じ・半目</h2><p>アニメーション中間フレーム</p></div></article>
+      <article><img src="neneko-blink-mouth-closed.png" alt="瞬き 口閉じ 閉じ目"><div class="copy"><h2>瞬き・口閉じ・閉じ目</h2><p>目を伏せた瞬き</p></div></article>
+      <article><img src="neneko-neutral.png" alt="真顔"><div class="copy"><h2>真顔</h2><p>表情を抑えた通常時</p></div></article>
+      <article><img src="neneko-argument.png" alt="強気の口論"><div class="copy"><h2>強気の口論</h2><p>強気に言い返す時</p></div></article>
+      <article><img src="neneko-determined.png" alt="負けない"><div class="copy"><h2>負けない</h2><p>静かな決意・踏ん張り</p></div></article>
+      <article><img src="neneko-sleepy.png" alt="寝ぼけ顔"><div class="copy"><h2>寝ぼけ顔</h2><p>片目半目の寝起き</p></div></article>
+      <article><img src="neneko-ganbaru.png" alt="頑張るっ"><div class="copy"><h2>頑張るっ</h2><p>両手ガッツポーズ</p></div></article>
+      <article><img src="neneko-tsundere.png" alt="ツンデレのツン"><div class="copy"><h2>ツンデレのツン</h2><p>好意を隠す強がり</p></div></article>
+      <article><img src="neneko-contempt.png" alt="見下し"><div class="copy"><h2>見下し</h2><p>冷たい軽蔑・限定使用</p></div></article>
+      <article><img src="neneko-frightened.png" alt="怯え"><div class="copy"><h2>怯え</h2><p>恐怖・不安で震える</p></div></article>
+      <article><img src="neneko-tearful-smile.png" alt="泣き笑い"><div class="copy"><h2>泣き笑い</h2><p>涙を浮かべた明るい笑顔</p></div></article>
+      <article><img src="neneko-bratty.png" alt="上から目線"><div class="copy"><h2>上から目線</h2><p>小悪魔的な余裕・限定使用</p></div></article>
+      <article><img src="neneko-zako.png" alt="ザコ"><div class="copy"><h2>ザコ</h2><p>軽い挑発・冗談の場面だけ</p></div></article>
+    </section>
+  </main>
+</body>
+</html>
