@@ -16,6 +16,7 @@
     title: '勝手口',
     caseName: '鶴見町 高齢女性宅 強盗致傷事件',
     dateLabel: '11月6日（水）',
+    dateShort: '11月6日',
     start: 13 * 60,
     end: 21 * 60,
     scene: 'sc_backdoor',
@@ -33,7 +34,7 @@
       X('……俺、何もしてないです。', 'neutral'),
     ],
     suspect: {
-      name: '浅野 悠斗', ruby: 'あさの ゆうと', age: 22, job: '宅配ドライバー（アルバイト）', address: '湊川市鶴見町',
+      name: '浅野 悠斗', short: '浅野', ruby: 'あさの ゆうと', age: 22, job: '宅配ドライバー（アルバイト）', address: '湊川市鶴見町',
       type: '小心者',
       typeNote: '動揺しやすく、威圧に弱い。ただし追い詰めすぎると殻に閉じこもる。情に厚い。',
       img: { neutral: 'a_nervous', defiant: 'a_defiant', panic: 'a_panic', lamp: 'a_lamp', soft: 'a_teary', broken: 'a_broken', stare: 'a_defiant', angry: 'a_defiant', shaken: 'a_panic', cold: 'a_defiant', irritated: 'a_defiant', grief: 'a_teary', exhausted: 'a_panic', steady: 'a_nervous' },
@@ -190,6 +191,7 @@
     title: '灰の帳簿',
     caseName: '湊川ロジスティクス本社 書庫放火事件',
     dateLabel: '11月14日（木）',
+    dateShort: '11月14日',
     start: 13 * 60,
     end: 21 * 60,
     scene: 'sc_archive',
@@ -208,7 +210,7 @@
       X('刑事さん。弁護士が来るまで、雑談なら付き合いますよ。', 'neutral'),
     ],
     suspect: {
-      name: '氷室 礼司', ruby: 'ひむろ れいじ', age: 48, job: '湊川ロジスティクス 経理部長', address: '湊川市汐見台',
+      name: '氷室 礼司', short: '氷室', ruby: 'ひむろ れいじ', age: 48, job: '湊川ロジスティクス 経理部長', address: '湊川市汐見台',
       type: '知能犯',
       typeNote: '理詰めで身を守る。威圧はむしろ逆効果。事実との矛盾と、共犯者の動揺が急所。',
       img: { neutral: 'h_composed', defiant: 'h_cold', panic: 'h_shaken', lamp: 'h_lamp', soft: 'h_composed', broken: 'h_defeated', stare: 'h_cold', angry: 'h_irritated', shaken: 'h_shaken', cold: 'h_cold', irritated: 'h_irritated', grief: 'h_shaken', exhausted: 'h_shaken', steady: 'h_composed' },
@@ -390,6 +392,7 @@
     title: '取調室三号',
     caseName: 'コーポ湊 フリー記者殺害事件',
     dateLabel: '11月18日（月）',
+    dateShort: '11月18日',
     start: 13 * 60,
     end: 22 * 60,
     flipTime: 19 * 60,
@@ -409,7 +412,7 @@
       X('七年前、兄貴の取り調べをした刑事だ。法廷で見た。その顔は、忘れない。', 'defiant'),
     ],
     suspect: {
-      name: '椎名 亮', ruby: 'しいな りょう', age: 27, job: '自動車整備士', address: '湊川市港町',
+      name: '椎名 亮', short: '椎名', ruby: 'しいな りょう', age: 27, job: '自動車整備士', address: '湊川市港町',
       type: '不明',
       typeAfter: '冤罪',
       typeNote: '反発が極めて強い。……動揺の上限が、異様に低い。',
@@ -548,7 +551,7 @@
         N('瀬名が、立ち上がった。'),
         S('久我さん。通話記録の照会結果が、出ました。'),
         S('宮地さんの最後の発信は、11月3日、午後9時2分。刑事課の直通です。内線の転送先は――', { fact: 'F10' }),
-        S('久我さんの、卓上電話です。'),
+        S('久我さんの、卓上電話です。', { typeReveal: true }),
         M('…………。'),
         M('あの夜のことは、よく覚えている。'),
         S('椎名さん。少し、外していただけますか。'),
@@ -560,6 +563,8 @@
 
   /* ──────────────── 第三章・逆転（被疑者席） ──────────────── */
   const reversal = {
+    // 被疑者席に座る久我の人定事項
+    self: { name: '久我 誠', short: '久我', age: 46, meta: '湊川署刑事課 警部補', job: '警察官（湊川警察署刑事課 警部補）', address: '湊川市港北町 湊川署職員官舎' },
     start: 19 * 60,
     end: 22 * 60,
     turns: 10,
@@ -617,7 +622,8 @@
       hear: { pov: 'pov_sit' },
       reask: 'もう一度、聞きます。',
       expose: { pov: 'pov_file' },
-      exposeLines: (lie, fact) => [S(`あなたは「${lie}」と言いましたね。`), S(`ですが――${fact}`), S('……説明してください。')],
+      // {lie} は嘘の要約（lieShort）、{fact} は資料の読み上げ（say）に置き換わる
+      exposeLines: ['あなたは「{lie}」と言いましたね。', 'ですが――{fact}', '……説明してください。'],
       exposeReplies: { rebel: '……それが、どうした。', comply: null, lie: '……何かの、間違いだ。', truth: null },
       bluffLines: [S('午後10時28分。左手を押さえて路地を走る、コートの人物が目撃されています。'), S('……あなたですね。「まっすぐ官舎に帰った」というのは、嘘だ。')],
       bluffReplies: { rebel: '顔も見ていない目撃証言で、何が言える。……それのどこが矛盾だ。', comply: '（目を、伏せてしまった。）', lie: 'コートの男など、いくらでもいる。', truth: null },
@@ -658,6 +664,9 @@
   const endings = {
     confess: {
       title: 'ENDING Ⅰ　完落ち',
+      name: '完落ち',
+      epitaph: '落としの久我は、最後に自分を落とした。',
+      record: { date: '11月18日', final: '11月3日午後10時25分ころ、非常階段4階の踊り場で、宮地恭子さんを突き飛ばし、転落させました。' },
       lines: [
         K('……全部、話す。'),
         K('11月3日の夜、9時2分。宮地から電話があった。七年前の件で、見せたいものがある、と。'),
@@ -678,6 +687,10 @@
     },
     survive: {
       title: 'ENDING Ⅱ　黙秘',
+      name: '黙秘',
+      epitaph: '落としの久我は、最後まで落ちなかった。',
+      // 一部を認めたまま持ちこたえたとき、3行目のあとに入る
+      partial: '認めたことは、いくつかある。だが、突き飛ばしたとは、最後まで言わなかった。',
       lines: [
         N('ライトが、消えた。', { pov: 'pov_off', sfx: 'lampOff' }),
         N('翌朝、瀬名は署長室に呼ばれ、調査の打ち切りを告げられたという。「監察の勇み足だ」と。'),
@@ -690,5 +703,11 @@
     },
   };
 
-  window.KANOCHI_DATA = { chapters: [ch1, ch2, ch3], reversal, endings, helpers: { N, M, K, S, X } };
+  /* ──────────────────────── 共通 ──────────────────────── */
+  // {name} は被疑者の名字に置き換わる
+  const common = {
+    timeUp: [N('午後9時。今日の取り調べは、ここまでだ。'), N('{name}は、最後まで落ちなかった。'), S('……勾留期限まで、もう日がありません。')],
+  };
+
+  window.KANOCHI_DATA = { chapters: [ch1, ch2, ch3], reversal, endings, common, helpers: { N, M, K, S, X } };
 })();
