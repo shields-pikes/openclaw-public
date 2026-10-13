@@ -1,9 +1,12 @@
 /* 完落ち ― 取調室・三章 ― ゲーム本体 */
 (() => {
   'use strict';
-  const DATA = window.KANOCHI_DATA;
+  const I18N = window.KANOCHI_I18N;
+  const tr = I18N.tr;
+  const SRC = window.KANOCHI_DATA;
+  // いまの言語に置き換えたシナリオ（useLang で入れ替わる）
+  let DATA = SRC, R = SRC.reversal;
   const Sfx = window.Sfx;
-  const R = DATA.reversal;
   const $ = (s, r = document) => r.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -12,7 +15,6 @@
   const IMG = n => `img/${n}.webp`;
   const THUMB = n => `img/t/${n}.webp`;
   const fmt = m => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
-  const KANJI = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三', '十四', '十五'];
   const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const N = (t, o) => Object.assign({ s: 'n', t }, o);
   const M = (t, o) => Object.assign({ s: 'm', t }, o);
@@ -21,13 +23,15 @@
   const X = (t, i, o) => Object.assign({ s: 'x', t, i }, o);
   const SYS = (t, o) => Object.assign({ s: 'sys', t }, o);
 
+  // 文言はどれも日本語の原文。画面に出すときに tr() で今の言語にする
+  const CMDS = [['hear', '聴き取り', '言い分を聞く'], ['facts', '捜査事実', '矛盾を突く'], ['shake', '揺さぶり', '心を動かす'], ['record', '供述調書', '記録を見る']];
   const COST = { hear: 15, point: 10, light: 5, desk: 5, tea: 10, katsudon: 30, accomplice: 10, parents: 15, demand: 10 };
   const SPEEDS = [{ label: 'ゆっくり', ms: 46 }, { label: 'ふつう', ms: 26 }, { label: 'はやい', ms: 11 }, { label: '一瞬', ms: 0 }];
   const SHAKES = [
     { id: 'light', name: 'スタンドライトを当てる', desc: '光で追い詰める。動揺↑ 反発↑' },
     { id: 'desk', name: '机を叩く', desc: '一喝する。動揺↑↑ 反発↑↑' },
     { id: 'tea', name: 'お茶を出す', desc: '気持ちをほぐす。懐柔↑ 動揺↓' },
-    { id: 'katsudon', name: 'カツ丼を出す', desc: '腹を満たす。懐柔↑↑（30分かかる）' },
+    { id: 'katsudon', name: 'カツ丼を出す', desc: '腹を満たす。懐柔↑↑' },
     { id: 'accomplice', name: '共犯者の様子を話す', desc: '複数犯のときだけ。共犯者の口が軽いほど効く' },
     { id: 'parents', name: '親に連絡する', desc: '情に訴える。効くかどうかは相手しだい' },
     { id: 'demand', name: '自白を求める', desc: '' },
@@ -42,7 +46,7 @@
 
   /* ───────────── 記録（ブラウザ内） ───────────── */
   const META_KEY = 'kanochi.v1';
-  const meta = Object.assign({ unlocked: 1, endings: [], speed: 1, sound: true, helpSeen: false, save: null }, (() => {
+  const meta = Object.assign({ unlocked: 1, endings: [], speed: 1, sound: true, helpSeen: false, save: null, lang: null }, (() => {
     try { return JSON.parse(localStorage.getItem(META_KEY)) || {}; } catch (e) { return {}; }
   })());
   const saveMeta = () => { try { localStorage.setItem(META_KEY, JSON.stringify(meta)); } catch (e) { /* 保存できない環境では記録なしで続行 */ } };
@@ -68,7 +72,7 @@
   const topic = id => CH().topics.find(t => t.id === id);
   const fact = id => CH().facts.find(f => f.id === id);
   const stmt = id => CH().statements.find(s => s.id === id);
-  const shortName = () => (G && G.phase !== 'rev' ? SUS().name.split(' ')[0] : '久我');
+  const shortName = () => (G && G.phase !== 'rev' ? SUS().short : R.self.short);
   const isRev = () => G && G.phase === 'rev';
   const qOf = id => R.questions.find(q => q.id === id);
 
@@ -132,7 +136,7 @@
   }
   function doStamp(kind) {
     ui.stamp.className = 'stamp ' + kind;
-    ui.stamp.textContent = kind === 'contra' ? '矛盾' : '矛盾なし';
+    ui.stamp.textContent = tr(kind === 'contra' ? '矛盾' : '矛盾なし');
     void ui.stamp.offsetWidth;
     ui.stamp.classList.add('go');
     Sfx.play(kind === 'contra' ? 'stamp' : 'nocontra');
@@ -141,7 +145,7 @@
   function renderRail() {
     ui.ncrail.innerHTML = '';
     if (!G || isRev() || !CH().innocent) return;
-    for (let i = 0; i < G.nc; i++) ui.ncrail.appendChild(Object.assign(document.createElement('span'), { textContent: '矛盾なし' }));
+    for (let i = 0; i < G.nc; i++) ui.ncrail.appendChild(Object.assign(document.createElement('span'), { textContent: tr('矛盾なし') }));
   }
   function setTension() {
     let tense = false, level = 0;
@@ -174,11 +178,11 @@
   const waitAdvance = () => new Promise(r => { advanceFn = r; });
   function labelFor(s) {
     switch (s) {
-      case 'k': return isRev() ? '久我（あなた）' : '久我';
-      case 's': return '瀬名';
-      case 'x': return G ? SUS().name.replace(' ', '') : '';
-      case 'm': return '久我・心の声';
-      case 'sys': return '記録';
+      case 'k': return isRev() ? tr('{name}（あなた）', { name: R.self.short }) : R.self.short;
+      case 's': return tr('瀬名');
+      case 'x': return G ? I18N.name(SUS().name) : '';
+      case 'm': return tr('{name}・心の声', { name: R.self.short });
+      case 'sys': return tr('記録');
       default: return '';
     }
   }
@@ -204,15 +208,14 @@
     const lab = labelFor(ln.s);
     ui.spk.innerHTML = lab ? `<b>${esc(lab)}</b>` : '';
     ui.txt.textContent = '';
-    const ms = skipAll ? 0 : SPEEDS[meta.speed].ms;
+    const ms = skipAll ? 0 : SPEEDS[meta.speed].ms * I18N.speed();
     typing = true; skipType = false;
     if (ms > 0) {
       for (let i = 0; i < text.length; i++) {
         if (skipType) break;
         ui.txt.textContent = text.slice(0, i + 1);
-        if (text[i] !== '…' && text[i] !== '　') Sfx.tick();
-        const ch = text[i];
-        await sleep(ch === '。' || ch === '！' || ch === '？' ? ms * 7 : ch === '、' ? ms * 4 : ms);
+        if (I18N.ticks(text[i])) Sfx.tick();
+        await sleep(ms * I18N.pause(text, i));
       }
     }
     ui.txt.textContent = text;
@@ -249,26 +252,26 @@
     const rev = isRev();
     const s = rev ? null : SUS();
     const Dc = rev ? R.D : s.D, Kc = rev ? R.K : s.K;
-    const name = rev ? '久我 誠' : s.name;
-    const metaTxt = rev ? '湊川署刑事課 警部補' : `${s.age}歳・${s.job}`;
-    let type = rev ? '被疑者' : s.type, typeCls = '';
+    const name = rev ? R.self.name : s.name;
+    const metaTxt = rev ? R.self.meta : tr('{age}歳・{job}', { age: s.age, job: s.job });
+    let type = rev ? tr('被疑者') : s.type, typeCls = '';
     if (!rev && CH().innocent) { if (G.flipped) { type = s.typeAfter; typeCls = 'innocent'; } else typeCls = 'unknown'; }
     const dPct = v => clamp(v, 0, 100);
     const kPct = v => (clamp(v, -100, 100) + 100) / 2;
     const voidD = `<i class="void" style="left:0;width:${dPct(Dc.min)}%"></i><i class="void" style="left:${dPct(Dc.max)}%;right:0"></i>`;
     const voidK = `<i class="void" style="left:0;width:${kPct(Kc.min)}%"></i><i class="void" style="left:${kPct(Kc.max)}%;right:0"></i>`;
     const markD = `<span class="mark" style="left:${dPct(Dc.mark)}%"></span>`;
-    const capD = `<span class="mk" style="left:${dPct(Dc.mark)}%">▲${rev ? '口が滑る' : '自供'}</span>`;
+    const capD = `<span class="mk" style="left:${dPct(Dc.mark)}%">▲${esc(tr(rev ? '口が滑る' : '自供'))}</span>`;
     const markK = !rev && Kc.honest != null ? `<span class="mark honest" style="left:${kPct(Kc.honest)}%"></span>` : '';
-    const capK = `<span class="end l">← 反発</span>${!rev && Kc.honest != null ? `<span class="mk honest" style="left:${kPct(Kc.honest)}%">▲本音</span>` : ''}<span class="end r">懐柔 →</span>`;
+    const capK = `<span class="end l">← ${esc(tr('反発'))}</span>${!rev && Kc.honest != null ? `<span class="mk honest" style="left:${kPct(Kc.honest)}%">▲${esc(tr('本音'))}</span>` : ''}<span class="end r">${esc(tr('懐柔'))} →</span>`;
     ui.meters.innerHTML = `
       <div class="who"><span class="nm">${esc(name)}</span><span class="meta">${esc(metaTxt)}</span><span class="type ${typeCls}" title="${esc(rev ? '' : s.typeNote)}">${esc(type)}</span></div>
-      <div class="gauge d" id="gD"><div class="gh"><span class="lb">${rev ? 'あなたの動揺' : '動揺'}</span><span class="num" id="nD"></span></div>
+      <div class="gauge d" id="gD"><div class="gh"><span class="lb">${esc(tr(rev ? 'あなたの動揺' : '動揺'))}</span><span class="num" id="nD"></span></div>
         <div class="track">${voidD}<i class="fill" id="fD"></i>${markD}<i class="ticks"></i></div><div class="cap">${capD}</div></div>
-      <div class="gauge k" id="gK"><div class="gh"><span class="lb">${rev ? 'あなたの懐柔／反発' : '懐柔／反発'}</span><span class="num" id="nK"></span></div>
+      <div class="gauge k" id="gK"><div class="gh"><span class="lb">${esc(tr(rev ? 'あなたの懐柔／反発' : '懐柔／反発'))}</span><span class="num" id="nK"></span></div>
         <div class="track">${voidK}<i class="zero"></i><i class="fill" id="fK"></i>${markK}<i class="ticks"></i></div><div class="cap">${capK}</div></div>
       <div class="conds" id="conds"></div>`;
-    ui.meters.setAttribute('aria-label', rev ? 'あなたの状態' : '被疑者の状態');
+    ui.meters.setAttribute('aria-label', tr(rev ? 'あなたの状態' : '被疑者の状態'));
     const cur = rev ? { D: G.rv.D, K: G.rv.K } : { D: G.D, K: G.K };
     applyGaugeVisual(cur, true);
   }
@@ -299,11 +302,11 @@
     const p = document.createElement('span');
     const up = v > 0;
     p.className = 'pop ' + (kind === 'D' ? (up ? 'up' : 'down') : (up ? 'kup' : 'kdown'));
-    p.textContent = (kind === 'D' ? '動揺' : (up ? '懐柔' : '反発')) + (kind === 'K' ? (up ? '+' : '+') + Math.abs(v) : (up ? '+' : '−') + Math.abs(v));
-    if (kind === 'D' && !up) p.textContent = '動揺−' + Math.abs(v);
+    p.textContent = tr('{label}{sign}{n}', { label: tr(kind === 'D' ? '動揺' : (up ? '懐柔' : '反発')), sign: kind === 'D' && !up ? '−' : '+', n: Math.abs(v) });
     (gauge.querySelector('.gh') || gauge).appendChild(p);
     setTimeout(() => p.remove(), 1700);
   }
+  const SEP = () => esc(tr('｜'));
   function renderConds(g) {
     const box = $('#conds'); if (!box) return;
     const rev = isRev();
@@ -311,24 +314,24 @@
       const rv = G.rv;
       const boxes = Array.from({ length: R.threshold }, (_, i) => `<i class="${i < rv.weight ? 'on' : ''}"></i>`).join('');
       const dm = g.D >= R.D.max, km = g.K >= R.K.max;
-      box.innerHTML = `<span class="stm">あなたの供述 ${boxes} ${Math.min(rv.weight, 99)}/${R.threshold}</span><span class="sep">｜</span>
-        <span class="${dm ? 'ok' : ''}">動揺MAX${dm ? '●' : '○'}</span><span class="${km ? 'ok' : ''}">懐柔MAX${km ? '●' : '○'}</span><span class="sep">｜</span>
-        <span>残り ${Math.max(0, R.turns - rv.turn)} 手</span>`;
+      box.innerHTML = `<span class="stm">${esc(tr('あなたの供述'))} ${boxes} ${Math.min(rv.weight, 99)}/${R.threshold}</span><span class="sep">${SEP()}</span>
+        <span class="${dm ? 'ok' : ''}">${esc(tr('動揺MAX'))}${dm ? '●' : '○'}</span><span class="${km ? 'ok' : ''}">${esc(tr('懐柔MAX'))}${km ? '●' : '○'}</span><span class="sep">${SEP()}</span>
+        <span>${esc(tr('残り {n} 手', { n: Math.max(0, R.turns - rv.turn) }))}</span>`;
       return;
     }
     const ch = CH(), s = SUS();
     const n = G.stmts.length;
     const dm = g.D >= s.D.max, km = g.K >= s.K.max;
     if (ch.innocent) {
-      box.innerHTML = `<span class="stm">供述 ${n}</span><span class="sep">｜</span><span>自白の条件：？</span>` +
-        (G.nc ? `<span class="sep">｜</span><span style="color:#9fbfcc">矛盾なし ×${G.nc}</span>` : '');
+      box.innerHTML = `<span class="stm">${esc(tr('供述 {n}件', { n }))}</span><span class="sep">${SEP()}</span><span>${esc(tr('自白の条件：？'))}</span>` +
+        (G.nc ? `<span class="sep">${SEP()}</span><span style="color:#9fbfcc">${esc(tr('矛盾なし ×{n}', { n: G.nc }))}</span>` : '');
       return;
     }
     const boxes = Array.from({ length: ch.threshold }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
     const ready = n >= ch.threshold;
-    box.innerHTML = `<span class="stm ${ready ? 'ok' : ''}">供述 ${boxes} ${n}/${ch.threshold}</span><span class="sep">｜</span>
-      <span class="${dm ? 'ok' : ''}">動揺MAX${dm ? '●' : '○'}</span><span class="${km ? 'ok' : ''}">懐柔MAX${km ? '●' : '○'}</span>
-      ${s.silentAtMin && g.K <= s.K.min ? '<span class="chip" style="color:#e0675c">黙秘</span>' : ''}`;
+    box.innerHTML = `<span class="stm ${ready ? 'ok' : ''}">${esc(tr('供述'))} ${boxes} ${n}/${ch.threshold}</span><span class="sep">${SEP()}</span>
+      <span class="${dm ? 'ok' : ''}">${esc(tr('動揺MAX'))}${dm ? '●' : '○'}</span><span class="${km ? 'ok' : ''}">${esc(tr('懐柔MAX'))}${km ? '●' : '○'}</span>
+      ${s.silentAtMin && g.K <= s.K.min ? `<span class="chip" style="color:#e0675c">${esc(tr('黙秘'))}</span>` : ''}`;
   }
   function delta(dD, dK) {
     const s = SUS();
@@ -345,14 +348,14 @@
     else render();
   }
   function setTop() {
-    if (!G) { ui.chap.textContent = '完落ち'; ui.caseL.textContent = ''; ui.clock.hidden = true; return; }
+    if (!G) { ui.chap.textContent = tr('完落ち'); ui.caseL.textContent = ''; ui.clock.hidden = true; return; }
     const ch = CH();
-    ui.chap.textContent = isRev() ? '第三章　逆転' : `${ch.no}　${ch.title}`;
-    ui.caseL.textContent = isRev() ? '被疑者：久我 誠（湊川署刑事課）' : ch.caseName;
+    ui.chap.textContent = isRev() ? tr('{no}　逆転', { no: ch.no }) : tr('{no}　{title}', { no: ch.no, title: ch.title });
+    ui.caseL.textContent = isRev() ? tr('被疑者：{name}（{meta}）', { name: R.self.name, meta: R.self.meta }) : ch.caseName;
     ui.clock.hidden = false;
     ui.clockTime.textContent = fmt(G.clock);
     const end = isRev() ? R.end : (ch.innocent ? null : ch.end);
-    ui.clockEnd.textContent = end ? `／ ${fmt(end)} まで` : ch.dateLabel;
+    ui.clockEnd.textContent = end ? tr('／ {time} まで', { time: fmt(end) }) : ch.dateLabel;
     ui.clock.classList.toggle('urgent', !!end && end - G.clock <= 90);
   }
   function render() {
@@ -367,11 +370,7 @@
     if (ui.commands.dataset.mode !== 'cmd') {
       ui.commands.dataset.mode = 'cmd';
       ui.commands.className = 'commands';
-      ui.commands.innerHTML = `
-        <button class="cmd" type="button" data-cmd="hear">聴き取り<small>言い分を聞く</small></button>
-        <button class="cmd" type="button" data-cmd="facts">捜査事実<small>矛盾を突く</small></button>
-        <button class="cmd" type="button" data-cmd="shake">揺さぶり<small>心を動かす</small></button>
-        <button class="cmd" type="button" data-cmd="record">供述調書<small>記録を見る</small></button>`;
+      ui.commands.innerHTML = CMDS.map(([id, name, sub]) => `<button class="cmd" type="button" data-cmd="${id}">${esc(tr(name))}<small>${esc(tr(sub))}</small></button>`).join('');
     }
     ui.commands.querySelectorAll('.cmd').forEach(b => {
       b.classList.toggle('active', b.dataset.cmd === panelKind && (ui.panel.classList.contains('open') || !isNarrow()));
@@ -403,43 +402,50 @@
     body.scrollTop = st;
     if (busy) body.querySelectorAll('button').forEach(b => { b.disabled = true; });
   }
+  // 聴取メモに出す文：本人が撤回していれば、認めた内容
+  function cardText(tid) {
+    const c = G.cards[tid];
+    if (c.by) return I18N.clip(I18N.trimLead(stmt(c.by).line));
+    if (c.admitted) return c.admitted; // 文字列で保存していたころの記録
+    return topic(tid).short;
+  }
   function cardHTML(tid, opts = {}) {
     const t = topic(tid), c = G.cards[tid];
     const labels = [];
-    if (c.contra) labels.push('<span class="lbl contra">矛盾</span>');
-    if (c.retracted && !c.contra) labels.push('<span class="lbl ret">撤回</span>');
-    if (c.nc.length) labels.push(`<span class="lbl nc">矛盾なし${c.nc.length > 1 ? '×' + c.nc.length : ''}</span>`);
-    if (c.deep && c.deep.length) labels.push('<span class="lbl deep">本音</span>');
+    if (c.contra) labels.push(`<span class="lbl contra">${esc(tr('矛盾'))}</span>`);
+    if (c.retracted && !c.contra) labels.push(`<span class="lbl ret">${esc(tr('撤回'))}</span>`);
+    if (c.nc.length) labels.push(`<span class="lbl nc">${esc(tr('矛盾なし'))}${c.nc.length > 1 ? '×' + c.nc.length : ''}</span>`);
+    if (c.deep && c.deep.length) labels.push(`<span class="lbl deep">${esc(tr('本音'))}</span>`);
     const checkedFacts = c.nc.map(f => fact(f).title);
-    const chk = checkedFacts.length ? `<div class="chk">照合済：${esc(checkedFacts.join('、'))}</div>` : '';
-    const txt = c.admitted ? c.admitted : t.short;
+    const chk = checkedFacts.length ? `<div class="chk">${esc(tr('照合済：{list}', { list: checkedFacts.join(tr('、')) }))}</div>` : '';
+    const txt = cardText(tid);
     const tag = opts.button ? 'button' : 'div';
     const cls = ['card', c.contra ? 'contra' : '', c.retracted ? 'ret' : '', opts.pick ? 'pick' : '', opts.sel ? 'sel' : '', opts.dim ? 'dim' : ''].join(' ');
     return `<${tag} class="${cls}" ${opts.button ? `type="button" data-topic="${tid}" ${opts.disabled ? 'disabled' : ''}` : ''}>
-      <div class="ct">${esc(t.label)}${opts.note ? `<span style="color:#8a5a20">・${esc(opts.note)}</span>` : ''}</div>
-      <div class="cq">「${esc(txt)}」</div>${chk}
+      <div class="ct">${esc(t.label)}${opts.note ? `<span style="color:#8a5a20">${esc(tr('・'))}${esc(opts.note)}</span>` : ''}</div>
+      <div class="cq">${esc(tr('「{q}」', { q: txt }))}</div>${chk}
       <div class="labels">${labels.join('')}</div></${tag}>`;
   }
   function renderHear(body) {
-    ui.panelTitle.textContent = '聴き取り';
-    ui.panelSub.textContent = 'テーマを選ぶ（15分）';
+    ui.panelTitle.textContent = tr('聴き取り');
+    ui.panelSub.textContent = tr('テーマを選ぶ（{n}分）', { n: COST.hear });
     const s = SUS(), ch = CH();
     const silent = s.silentAtMin && G.K <= s.K.min;
     const honest = G.K >= s.K.honest;
     let h = '';
-    if (silent) h += `<p class="hint lamp">${esc(shortName())}は黙秘している。懐柔しないと、口を開かない。</p>`;
-    else if (honest) h += `<p class="hint lamp">今なら、本音を聞けるかもしれない。聴取済みのテーマを、もう一度聞いてみる。</p>`;
-    else if (!G.cardOrder.length) h += `<p class="hint">まずは言い分を聞く。答えは「聴取メモ」に残り、捜査事実と照らし合わせられる。</p>`;
-    h += `<div class="sect-title">聴取テーマ</div><div class="topics">`;
+    if (silent) h += `<p class="hint lamp">${esc(tr('{name}は黙秘している。懐柔しないと、口を開かない。', { name: shortName() }))}</p>`;
+    else if (honest) h += `<p class="hint lamp">${esc(tr('今なら、本音を聞けるかもしれない。聴取済みのテーマを、もう一度聞いてみる。'))}</p>`;
+    else if (!G.cardOrder.length) h += `<p class="hint">${esc(tr('まずは言い分を聞く。答えは「聴取メモ」に残り、捜査事実と照らし合わせられる。'))}</p>`;
+    h += `<div class="sect-title">${esc(tr('聴取テーマ'))}</div><div class="topics">`;
     for (const tid of G.unlocked) {
       const t = topic(tid), c = G.cards[tid];
-      let st = '<span class="st new">未聴取</span>';
-      if (c) st = honest && (t.deep || []).some(id => !G.stmts.includes(id)) ? '<span class="st honest">本音を聞く</span>' : '<span class="st">聴取済</span>';
+      let st = `<span class="st new">${esc(tr('未聴取'))}</span>`;
+      if (c) st = honest && (t.deep || []).some(id => !G.stmts.includes(id)) ? `<span class="st honest">${esc(tr('本音を聞く'))}</span>` : `<span class="st">${esc(tr('聴取済'))}</span>`;
       h += `<button class="topic" type="button" data-hear="${tid}"><span class="tl">${esc(t.label)}</span>${st}</button>`;
     }
     h += '</div>';
     if (G.cardOrder.length) {
-      h += `<div class="sect-title">聴取メモ（${G.cardOrder.length}）</div><div class="cards">`;
+      h += `<div class="sect-title">${esc(tr('聴取メモ（{n}）', { n: G.cardOrder.length }))}</div><div class="cards">`;
       for (const tid of [...G.cardOrder].reverse()) h += cardHTML(tid);
       h += '</div>';
     }
@@ -453,34 +459,34 @@
       ${img}<div><div class="ft">${esc(f.title)}${isNew ? '<span class="new">NEW</span>' : ''}</div><div class="fx">${esc(f.text)}</div></div></${button ? 'button' : 'div'}>`;
   }
   function renderFacts(body) {
-    ui.panelTitle.textContent = '捜査結果';
-    ui.panelSub.textContent = '判明した事実 → 聴取メモの順に選ぶ';
+    ui.panelTitle.textContent = tr('捜査結果');
+    ui.panelSub.textContent = tr('判明した事実 → 聴取メモの順に選ぶ');
     let h = '';
     if (!pick.fact) {
-      h += `<p class="hint">供述と食い違う事実を選び、その供述を突きつける。矛盾していなければ、反論される。</p>`;
-      h += `<div class="sect-title">判明した事実（${G.facts.length}）</div><div class="facts">`;
+      h += `<p class="hint">${esc(tr('供述と食い違う事実を選び、その供述を突きつける。矛盾していなければ、反論される。'))}</p>`;
+      h += `<div class="sect-title">${esc(tr('判明した事実（{n}）', { n: G.facts.length }))}</div><div class="facts">`;
       const order = [...G.facts.filter(f => G.freshFacts.includes(f)).reverse(), ...G.facts.filter(f => !G.freshFacts.includes(f))];
       for (const fid of order) h += factHTML(fid);
       h += '</div>';
     } else {
-      h += `<div class="sect-title">選んだ事実</div>${factHTML(pick.fact, { sel: true, button: false })}
-        <button class="btn" type="button" data-unpick="1" style="justify-self:start">事実を選び直す</button>`;
-      if (!G.cardOrder.length) h += `<p class="hint lamp">まだ聴取メモがない。先に聴き取りで言い分を集めよう。</p>`;
+      h += `<div class="sect-title">${esc(tr('選んだ事実'))}</div>${factHTML(pick.fact, { sel: true, button: false })}
+        <button class="btn" type="button" data-unpick="1" style="justify-self:start">${esc(tr('事実を選び直す'))}</button>`;
+      if (!G.cardOrder.length) h += `<p class="hint lamp">${esc(tr('まだ聴取メモがない。先に聴き取りで言い分を集めよう。'))}</p>`;
       else {
-        h += `<div class="sect-title">この事実と矛盾する聴取メモは？</div><div class="cards">`;
+        h += `<div class="sect-title">${esc(tr('この事実と矛盾する聴取メモは？'))}</div><div class="cards">`;
         for (const tid of [...G.cardOrder].reverse()) {
           const c = G.cards[tid];
           const done = G.checked.includes(pick.fact + '|' + tid);
           const closed = c.contra || c.retracted;
-          const note = closed ? (c.contra ? '矛盾を指摘済み' : '本人が撤回済み') : done ? 'この事実とは照合済み' : '';
+          const note = closed ? tr(c.contra ? '矛盾を指摘済み' : '本人が撤回済み') : done ? tr('この事実とは照合済み') : '';
           h += cardHTML(tid, { button: true, pick: !closed && !done, sel: pick.topic === tid, dim: closed || done, disabled: closed || done, note });
         }
         h += '</div>';
       }
       if (pick.topic) {
-        const t = topic(pick.topic), f = fact(pick.fact);
-        h += `<div class="pairbar"><p>【事実】${esc(f.title)}<br>【供述】「${esc(G.cards[pick.topic].admitted || t.short)}」</p>
-          <div class="row"><button class="btn primary" type="button" data-point="1">矛盾を指摘する（10分）</button><button class="btn" type="button" data-unpick="topic">やめる</button></div></div>`;
+        const f = fact(pick.fact);
+        h += `<div class="pairbar"><p>${esc(tr('【事実】{v}', { v: f.title }))}<br>${esc(tr('【供述】「{v}」', { v: cardText(pick.topic) }))}</p>
+          <div class="row"><button class="btn primary" type="button" data-point="1">${esc(tr('矛盾を指摘する（{n}分）', { n: COST.point }))}</button><button class="btn" type="button" data-unpick="topic">${esc(tr('やめる'))}</button></div></div>`;
       }
     }
     body.innerHTML = h;
@@ -491,55 +497,62 @@
     return G.stmts.length >= ch.threshold || (G.D >= s.D.max && G.K >= s.K.max);
   }
   function renderShake(body) {
-    ui.panelTitle.textContent = '揺さぶり';
-    ui.panelSub.textContent = '相手のタイプで効き目が変わる';
+    ui.panelTitle.textContent = tr('揺さぶり');
+    ui.panelSub.textContent = tr('相手のタイプで効き目が変わる');
     const ch = CH(), s = SUS();
     let h = '';
-    if (G.D >= s.D.max || G.K >= s.K.max) h += `<p class="hint lamp">${G.D >= s.D.max ? '動揺' : '懐柔'}が最高値だ。いま揺さぶれば、何か話すかもしれない。</p>`;
-    h += `<p class="hint">タイプ「${esc(s.type)}」――${esc(s.typeNote)}</p><div class="shakes">`;
+    if (G.D >= s.D.max || G.K >= s.K.max) h += `<p class="hint lamp">${esc(tr('{g}が最高値だ。いま揺さぶれば、何か話すかもしれない。', { g: tr(G.D >= s.D.max ? '動揺' : '懐柔') }))}</p>`;
+    h += `<p class="hint">${esc(tr('タイプ「{type}」――{note}', { type: s.type, note: s.typeNote }))}</p><div class="shakes">`;
     for (const sh of SHAKES) {
-      let desc = sh.desc, dis = false, cls = '';
+      let desc = sh.desc ? tr(sh.desc) : '', dis = false, cls = '';
       const used = G.uses[sh.id] || 0;
-      if (sh.id === 'accomplice' && ch.singleCulprit) { dis = true; desc = '単独犯のため、使えない'; }
+      if (sh.id === 'accomplice' && ch.singleCulprit) { dis = true; desc = tr('単独犯のため、使えない'); }
       if (sh.id === 'demand') {
         cls = 'demand' + (demandReady() ? ' ready' : '');
-        desc = ch.innocent ? '条件は不明。' : `条件：供述${ch.threshold}件以上、または動揺と懐柔がともに最高値。潰していない嘘が残っていると、それを盾に反論される。`;
+        desc = ch.innocent ? tr('条件は不明。') : tr('条件：供述{n}件以上、または動揺と懐柔がともに最高値。潰していない嘘が残っていると、それを盾に反論される。', { n: ch.threshold });
       }
       const lf = G.lastFx && G.lastFx[sh.id];
-      const fxTxt = lf ? `　前回：動揺${lf.dD >= 0 ? '+' : '−'}${Math.abs(lf.dD)}・${lf.dK >= 0 ? '懐柔+' + lf.dK : '反発+' + Math.abs(lf.dK)}` : '';
-      const cnt = used ? `<span class="cnt">${sh.id === 'katsudon' ? `${used}杯` : `${used}回`}${fxTxt}</span>` : '';
-      h += `<button class="shake ${cls}" type="button" data-shake="${sh.id}" ${dis ? 'disabled data-off="1"' : ''}><b>${esc(sh.name)}</b><span>${esc(desc)}（${COST[sh.id]}分）</span>${cnt}</button>`;
+      const fxTxt = lf ? tr('　前回：{d}・{k}', { d: tr('動揺') + (lf.dD >= 0 ? '+' : '−') + Math.abs(lf.dD), k: lf.dK >= 0 ? tr('懐柔') + '+' + lf.dK : tr('反発') + '+' + Math.abs(lf.dK) }) : '';
+      const cnt = used ? `<span class="cnt">${esc(I18N.trc('shake', sh.id === 'katsudon' ? '{n}杯' : '{n}回', { n: used }) + fxTxt)}</span>` : '';
+      h += `<button class="shake ${cls}" type="button" data-shake="${sh.id}" ${dis ? 'disabled data-off="1"' : ''}><b>${esc(tr(sh.name))}</b><span>${esc(tr('{desc}（{n}分）', { desc, n: COST[sh.id] }))}</span>${cnt}</button>`;
     }
     h += '</div>';
     body.innerHTML = h;
   }
   function recordHTML(opts) {
     // opts: { title, rows:[{k,v}], intro, items:[doc], closing, signer, sign }
-    const items = opts.items.length ? opts.items.map((d, i) => `<p><span class="num">${KANJI[i + 1] || i + 1}</span>　${esc(d)}</p>`).join('')
-      : '<p class="empty">（まだ、供述はない）</p>';
-    const rows = opts.rows.map(r => `<p class="meta">${esc(r.k)}　${esc(r.v)}</p>`).join('');
+    const items = opts.items.length ? opts.items.map((d, i) => `<p><span class="num">${I18N.num(i + 1)}</span>${I18N.gap()}${esc(d)}</p>`).join('')
+      : `<p class="empty">${esc(tr('（まだ、供述はない）'))}</p>`;
+    const rows = opts.rows.map(r => `<p class="meta">${esc(r.k)}${I18N.gap()}${esc(r.v)}</p>`).join('');
     const closing = opts.closing ? `<p class="end">${esc(opts.closing)}</p>` : '';
-    const sign = opts.sign ? `<p class="sig">${esc(opts.signer)}　<span id="fpSlot"></span></p>` : '';
-    return `<div class="record-wrap"><div class="record" id="recordDoc"><h3>供述調書</h3>${rows}<p>${esc(opts.intro)}</p>${items}${closing}${sign}</div></div>`;
+    const sign = opts.sign ? `<p class="sig">${esc(opts.signer)}${I18N.gap()}<span id="fpSlot"></span></p>` : '';
+    return `<div class="record-wrap"><div class="record" id="recordDoc"><h3>${esc(tr('供述調書'))}</h3>${rows}<p>${esc(opts.intro)}</p>${items}${closing}${sign}</div></div>`;
   }
+  const recordRows = (address, job, name, age) => [
+    { k: tr('住居'), v: address }, { k: tr('職業'), v: job }, { k: tr('氏名'), v: I18N.name(name) }, { k: tr('年齢'), v: tr('{n}歳', { n: age }) },
+  ];
+  const recordIntro = date => tr('上記の者は、令和○年{date}、湊川警察署において、本職に対し、任意、次のとおり供述した。', { date });
+  const recordClosing = () => tr('以上のとおり録取して読み聞かせたところ、誤りのないことを申し立て、署名指印した。');
   function chapterRecordOpts(sign) {
     const ch = CH(), s = SUS();
     return {
-      rows: [{ k: '住居', v: s.address }, { k: '職業', v: s.job }, { k: '氏名', v: s.name.replace(' ', '') }, { k: '年齢', v: `${s.age}歳` }],
-      intro: `上記の者は、令和○年${ch.dateLabel.replace(/（.）/, '')}、湊川警察署において、本職に対し、任意、次のとおり供述した。`,
+      rows: recordRows(s.address, s.job, s.name, s.age),
+      intro: recordIntro(ch.dateShort),
       items: G.stmts.map(id => stmt(id).doc),
-      closing: sign ? '以上のとおり録取して読み聞かせたところ、誤りのないことを申し立て、署名指印した。' : '',
-      signer: s.name.replace(' ', ''), sign,
+      closing: sign ? recordClosing() : '',
+      signer: I18N.name(s.name), sign,
     };
   }
+  // 縦書きの調書か（日本語）。横書きなら上から読む
+  const isVertical = el => !!el && getComputedStyle(el).writingMode.startsWith('vertical');
   function renderRecordPanel(body) {
     const ch = CH();
-    ui.panelTitle.textContent = '供述調書';
-    ui.panelSub.textContent = ch.innocent ? `供述 ${G.stmts.length}件` : `供述 ${G.stmts.length} / ${ch.threshold}`;
+    ui.panelTitle.textContent = tr('供述調書');
+    ui.panelSub.textContent = ch.innocent ? tr('供述 {n}件', { n: G.stmts.length }) : tr('供述 {n} / {m}', { n: G.stmts.length, m: ch.threshold });
     let h = recordHTML(chapterRecordOpts(false));
-    h += `<p class="hint">供述は、懐柔した上での聴き取り・矛盾の指摘・最高値のときの揺さぶりで増える。動揺が「自供」の目盛りを超えるか、懐柔が最高値になると、相手のほうから話し始める。</p>`;
+    h += `<p class="hint">${esc(tr('供述は、懐柔した上での聴き取り・矛盾の指摘・最高値のときの揺さぶりで増える。動揺が「自供」の目盛りを超えるか、懐柔が最高値になると、相手のほうから話し始める。'))}</p>`;
     body.innerHTML = h;
-    const doc = $('#recordDoc'); if (doc && doc.parentElement) doc.parentElement.scrollLeft = doc.parentElement.scrollWidth;
+    const doc = $('#recordDoc'); if (isVertical(doc) && doc.parentElement) doc.parentElement.scrollLeft = doc.parentElement.scrollWidth;
   }
 
   /* ───────────── 章の進行 ───────────── */
@@ -578,7 +591,7 @@
     buildMeters(); render();
     await play(clone(ch.intro));
     if (ch.tutorial && !meta.helpSeen) { meta.helpSeen = true; saveMeta(); await showHelp(true); }
-    idleText(`――${shortName()}を、どう攻める。`);
+    idleAsk();
     saveProgress();
   }
   function enterRoom() {
@@ -595,8 +608,9 @@
     pick = { fact: null, topic: null };
     try { await fn(); }
     catch (e) { console.error(e); }
-    if (!busy) { render(); if (G && !G.over) { idleText(isRev() ? '' : `――${shortName()}を、どう攻める。`); saveProgress(); } }
+    if (!busy) { render(); if (G && !G.over) { if (isRev()) idleText(''); else idleAsk(); saveProgress(); } }
   }
+  const idleAsk = () => idleText(tr('――{name}を、どう攻める。', { name: shortName() }));
 
   function advanceClock(min) { G.clock += min; setTop(); }
 
@@ -604,19 +618,15 @@
     const t = topic(tid);
     // 嘘をすでに自分で撤回していれば、聞かれても認めた内容を話す
     const by = CH().statements.find(s => s.retracts === tid && G.stmts.includes(s.id));
-    G.cards[tid] = { contra: false, nc: [], retracted: !!by, deep: [], admitted: null };
+    G.cards[tid] = { contra: false, nc: [], retracted: !!by, deep: [], by: by ? by.id : null };
     G.cardOrder.push(tid);
-    if (by) {
-      const line = by.line.replace(/^……/, '');
-      G.cards[tid].admitted = line.length > 42 ? line.slice(0, 41) + '…' : line;
-      return X('……さっき、話したとおりです。' + line, 'soft', { newCard: tid });
-    }
+    if (by) return X(tr('……さっき、話したとおりです。{line}', { line: I18N.trimLead(by.line) }), 'soft', { newCard: tid });
     return X(t.claim, mood, { newCard: tid });
   }
   function revealFact(fid) {
     if (!G.facts.includes(fid)) G.facts.push(fid);
     const f = fact(fid);
-    if (f) { Sfx.play('report'); toast(`<b>捜査事実</b>　${esc(f.title)}`, 3200); }
+    if (f) { Sfx.play('report'); toast(`<b>${esc(tr('捜査事実'))}</b>${I18N.gap()}${esc(f.title)}`, 3200); }
   }
 
   async function doHear(tid) {
@@ -632,7 +642,7 @@
       const ln = cardFor(tid, moodKey());
       ln.gauge = delta(s.fx.hear.D, s.fx.hear.K);
       lines.push(ln);
-      if (ch.tutorial && !G.hints.firstHear) { G.hints.firstHear = 1; lines.push(M('言い分は「聴取メモ」に残る。事実と食い違う嘘を探せ。')); }
+      if (ch.tutorial && !G.hints.firstHear) { G.hints.firstHear = 1; lines.push(M(tr('言い分は「聴取メモ」に残る。事実と食い違う嘘を探せ。'))); }
     } else if (G.K >= s.K.honest) {
       const sid = (t.deep || []).find(id => !G.stmts.includes(id));
       if (sid) {
@@ -662,28 +672,28 @@
   function onStatementShown(sid) {
     Sfx.play('stmt');
     const n = G.stmts.indexOf(sid) + 1;
-    toast(`<b>供述 ${KANJI[n] || n}</b>　供述調書に記録した`);
+    toast(`<b>${esc(tr('供述 {n}', { n: I18N.num(n) }))}</b>${I18N.gap()}${esc(tr('供述調書に記録した'))}`);
     render();
   }
 
   async function doPoint(fid, tid) {
-    const ch = CH(), s = SUS(), f = fact(fid), t = topic(tid), c = G.cards[tid];
+    const ch = CH(), s = SUS(), f = fact(fid), c = G.cards[tid];
     G.actions++;
     G.checked.push(fid + '|' + tid);
     const lines = [
-      K(`「${c.admitted || t.short}」――そう言ったな。`, { i: moodKey() }),
-      N(f.text, { ins: f.img || null, insHold: !!f.img, tag: `捜査事実：${f.title}` }),
-      K('これは、どういうことだ。', { fx: 'push' }),
+      K(tr('「{claim}」――そう言ったな。', { claim: cardText(tid) }), { i: moodKey() }),
+      N(f.text, { ins: f.img || null, insHold: !!f.img, tag: tr('捜査事実：{title}', { title: f.title }) }),
+      K(tr('これは、どういうことだ。'), { fx: 'push' }),
     ];
     const sid = f.hits[tid];
     if (sid && !c.contra && !c.retracted) {
       c.contra = true; c.contraFact = fid; G.stats.contra++;
       lines.push(SYS('', { stamp: 'contra', wait: 900, call: () => render() }));
-      const react = clone((f.react && f.react[tid]) || [X('……っ。', 'panic')]);
+      const react = clone((f.react && f.react[tid]) || [X(tr('……っ。'), 'panic')]);
       react[0].gauge = delta(s.fx.contra.D, 0);
       lines.push(...react);
       if (!G.stmts.includes(sid)) lines.push(...gainStatement(sid, X(stmt(sid).line, 'panic')));
-      if (ch.tutorial && !G.hints.firstContra) { G.hints.firstContra = 1; lines.push(M('嘘をひとつ崩せば、人は揺らぐ。')); }
+      if (ch.tutorial && !G.hints.firstContra) { G.hints.firstContra = 1; lines.push(M(tr('嘘をひとつ崩せば、人は揺らぐ。'))); }
     } else {
       c.nc.push(fid); G.nc++; G.stats.wrong++;
       lines.push(SYS('', { stamp: 'nocontra', wait: 800, call: () => { render(); renderRail(); } }));
@@ -698,9 +708,9 @@
       if (f.unlock && f.unlock[tid] && !G.unlocked.includes(f.unlock[tid])) {
         const nt = f.unlock[tid];
         G.unlocked.push(nt);
-        lines.push(SYS(`聴取テーマ「${topic(nt).label}」が加わった。`, { sfx: 'report' }));
+        lines.push(SYS(tr('聴取テーマ「{label}」が加わった。', { label: topic(nt).label }), { sfx: 'report' }));
       }
-      if (ch.tutorial && !G.hints.firstWrong) { G.hints.firstWrong = 1; lines.push(M('焦るな。矛盾していないものを突けば、相手に逃げ道を与えるだけだ。')); }
+      if (ch.tutorial && !G.hints.firstWrong) { G.hints.firstWrong = 1; lines.push(M(tr('焦るな。矛盾していないものを突けば、相手に逃げ道を与えるだけだ。'))); }
       if (!ch.innocent && (G.stats.wrong === 2 || G.stats.wrong === 4)) lines.push(...senaHint());
     }
     advanceClock(COST.point);
@@ -714,19 +724,19 @@
       const c = G.cards[tid];
       if (c.contra || c.retracted) continue;
       const fid = G.facts.find(f => fact(f).hits && fact(f).hits[tid] && !G.checked.includes(f + '|' + tid));
-      if (fid) return [S(`……久我さん。「${fact(fid).title}」と「${topic(tid).label}」の話、並べてみてはどうでしょう。`)];
+      if (fid) return [S(tr('……久我さん。「{fact}」と「{topic}」の話、並べてみてはどうでしょう。', { fact: fact(fid).title, topic: topic(tid).label }))];
     }
     const unheard = G.unlocked.find(t => !G.cards[t]);
-    if (unheard) return [S(`……久我さん。「${topic(unheard).label}」のこと、まだ聞いていませんよね。`)];
-    return [S('……久我さん。供述は、懐柔した上で聞き直せば出てくるかもしれません。')];
+    if (unheard) return [S(tr('……久我さん。「{topic}」のこと、まだ聞いていませんよね。', { topic: topic(unheard).label }))];
+    return [S(tr('……久我さん。供述は、懐柔した上で聞き直せば出てくるかもしれません。'))];
   }
   function actionLines(kind, entry) {
     const nm = shortName();
     switch (kind) {
-      case 'light': return [N(`スタンドライトの首を回し、光を${nm}の顔に向けた。`, { ins: 'ins_lamp', sfx: 'lamp' }), { fx: 'lampOn', i: 'lamp', wait: 350 }];
-      case 'desk': return [K('――いい加減にしろ！', { fx: 'shake', sfx: 'slam', ins: entry.ins || (G.ci === 0 ? 'ins_slam' : null) })];
-      case 'tea': return [N(`湯呑みに茶を注ぎ、${nm}の前に置いた。`, { ins: 'ins_tea', sfx: 'tea' })];
-      case 'katsudon': return [N('出前のカツ丼を、机に置いた。', { ins: 'ins_katsudon', sfx: 'katsudon' })];
+      case 'light': return [N(tr('スタンドライトの首を回し、光を{name}の顔に向けた。', { name: nm }), { ins: 'ins_lamp', sfx: 'lamp' }), { fx: 'lampOn', i: 'lamp', wait: 350 }];
+      case 'desk': return [K(tr('――いい加減にしろ！'), { fx: 'shake', sfx: 'slam', ins: entry.ins || (G.ci === 0 ? 'ins_slam' : null) })];
+      case 'tea': return [N(tr('湯呑みに茶を注ぎ、{name}の前に置いた。', { name: nm }), { ins: 'ins_tea', sfx: 'tea' })];
+      case 'katsudon': return [N(tr('出前のカツ丼を、机に置いた。'), { ins: 'ins_katsudon', sfx: 'katsudon' })];
       case 'parents': return [{ ins: 'ins_phone', sfx: 'phone', wait: 900 }];
       case 'accomplice': return [{ ins: entry.ins || 'ins_window', wait: 700 }];
       default: return [];
@@ -779,7 +789,7 @@
   async function doDemand() {
     const ch = CH(), s = SUS();
     G.actions++; G.uses.demand = (G.uses.demand || 0) + 1;
-    const lines = [K(`${shortName()}。……もう、全部話せ。`, { fx: 'push' })];
+    const lines = [K(tr('{name}。……もう、全部話せ。', { name: shortName() }), { fx: 'push' })];
     const bothMax = G.D >= s.D.max && G.K >= s.K.max;
     advanceClock(COST.demand);
     if (ch.innocent) {
@@ -792,7 +802,7 @@
       const t = un[0];
       G.stats.rebut++;
       lines.push(X(t.rebut, 'defiant', { gauge: delta(s.fx.rebut.D, s.fx.rebut.K), sfx: 'rebut', fx: 'shake' }));
-      lines.push(M(`……「${t.label}」の嘘を、まだ潰していなかった。そこを突かれた。`));
+      lines.push(M(tr('……「{label}」の嘘を、まだ潰していなかった。そこを突かれた。', { label: t.label })));
       await play(lines); return endTurn();
     }
     if (G.stmts.length >= ch.threshold || bothMax) return clearChapter();
@@ -825,7 +835,7 @@
       if (!ok) continue;
       G.facts.push(f.id); G.newFacts.push(f.id); G.freshFacts.push(f.id);
       out.push(...clone(f.report || []));
-      out.push(SYS(`捜査事実に「${f.title}」が加わった。`, { sfx: 'report', call: () => render() }));
+      out.push(SYS(tr('捜査事実に「{title}」が加わった。', { title: f.title }), { sfx: 'report', call: () => render() }));
     }
     return out;
   }
@@ -845,9 +855,9 @@
       if (sid) lines.push(...spontLines(sid, false));
     }
     if (ch.tutorial) {
-      if (!G.hints.honest && G.K >= s.K.honest) { G.hints.honest = 1; lines.push(M('……今なら、本音を聞けるかもしれない。聴取済みのテーマを、もう一度聞いてみるか。')); }
-      if (!G.hints.ready && G.stmts.length >= ch.threshold) { G.hints.ready = 1; lines.push(M('供述は揃った。……潰し残した嘘がなければ、落ちる。')); }
-      if (!G.hints.silent && silent) { G.hints.silent = 1; lines.push(M('殻に閉じこもった。茶でも出して、ほぐすしかない。')); }
+      if (!G.hints.honest && G.K >= s.K.honest) { G.hints.honest = 1; lines.push(M(tr('……今なら、本音を聞けるかもしれない。聴取済みのテーマを、もう一度聞いてみるか。'))); }
+      if (!G.hints.ready && G.stmts.length >= ch.threshold) { G.hints.ready = 1; lines.push(M(tr('供述は揃った。……潰し残した嘘がなければ、落ちる。'))); }
+      if (!G.hints.silent && silent) { G.hints.silent = 1; lines.push(M(tr('殻に閉じこもった。茶でも出して、ほぐすしかない。'))); }
     }
     if (s.fx.decay && G.D > s.D.min) { const g = delta(s.fx.decay, 0); g.dD = 0; lines.push({ gauge: g }); }
     if (lines.length) await play(lines);
@@ -867,7 +877,7 @@
     lines[1].sfx = 'clear';
     await play(lines);
     Sfx.heartbeat(0);
-    await signingScreen(recordHTML(chapterRecordOpts(true)), SUS().name.replace(' ', ''));
+    await signingScreen(recordHTML(chapterRecordOpts(true)), I18N.name(SUS().name));
     enterRoom();
     await play(clone(ch.lines.epilogue));
     meta.unlocked = Math.max(meta.unlocked, ch.id + 1);
@@ -878,13 +888,13 @@
   async function gameOver() {
     G.over = true;
     Sfx.play('gameover'); Sfx.heartbeat(0);
-    await play([N('午後9時。今日の取り調べは、ここまでだ。'), N(`${shortName()}は、最後まで落ちなかった。`), S('……勾留期限まで、もう日がありません。')]);
+    await play(clone(DATA.common.timeUp));
     meta.save = null; saveMeta();
     const ch = CH();
-    showOverlay(`<div class="screen card-screen"><div class="result"><h2>落とせなかった</h2>
-      <p class="lead">${esc(ch.no)}「${esc(ch.title)}」――取り調べの時間が尽きた。供述 ${G.stmts.length}件、指摘した矛盾 ${G.stats.contra}件。</p>
-      <p class="lead" style="font-size:13px;color:#6b6255">ヒント：嘘は事実で潰す。懐柔した上で聞けば本音が出る。動揺が「自供」の目盛りを超えると、相手から話し始める。</p>
-      <div class="row"><button class="btn primary" type="button" data-go="retry">${esc(ch.no)}をやり直す</button><button class="btn" type="button" data-go="title">タイトルへ</button></div></div></div>`);
+    showOverlay(`<div class="screen card-screen"><div class="result"><h2>${esc(tr('落とせなかった'))}</h2>
+      <p class="lead">${esc(tr('{no}「{title}」――取り調べの時間が尽きた。供述 {n}件、指摘した矛盾 {c}件。', { no: ch.no, title: ch.title, n: G.stmts.length, c: G.stats.contra }))}</p>
+      <p class="lead" style="font-size:13px;color:#6b6255">${esc(tr('ヒント：嘘は事実で潰す。懐柔した上で聞けば本音が出る。動揺が「自供」の目盛りを超えると、相手から話し始める。'))}</p>
+      <div class="row"><button class="btn primary" type="button" data-go="retry">${esc(tr('{no}をやり直す', { no: ch.no }))}</button><button class="btn" type="button" data-go="title">${esc(tr('タイトルへ'))}</button></div></div></div>`);
   }
 
   /* ───────────── 第三章：逆転 ───────────── */
@@ -895,10 +905,10 @@
     if (reason === 'late') lines.push(...clone(ch.lines.flipLate));
     // まだ届いていない鑑識結果を、ここで揃える
     for (const id of ['F7', 'F8', 'F9']) {
-      if (!G.facts.includes(id)) { G.facts.push(id); G.freshFacts.push(id); lines.push(...clone(fact(id).report || []), SYS(`捜査事実に「${fact(id).title}」が加わった。`, { sfx: 'report', call: () => render() })); }
+      if (!G.facts.includes(id)) { G.facts.push(id); G.freshFacts.push(id); lines.push(...clone(fact(id).report || []), SYS(tr('捜査事実に「{title}」が加わった。', { title: fact(id).title }), { sfx: 'report', call: () => render() })); }
     }
     const fl = clone(ch.lines.flip);
-    const reveal = fl.find(l => l.t && l.t.includes('卓上電話'));
+    const reveal = fl.find(l => l.typeReveal);
     if (reveal) reveal.call = () => { G.flipped = true; buildMeters(); };
     lines.push({ sfx: 'reveal', wait: 200 }, ...fl);
     await play(lines);
@@ -919,7 +929,7 @@
     ui.flash.style.opacity = '0';
     await sleep(900);
     ui.flash.style.transition = '';
-    toast('<b>立場が、逆転した。</b>　これより、あなたが取り調べを受ける', 3800);
+    toast(`<b>${esc(tr('立場が、逆転した。'))}</b>${I18N.gap()}${esc(tr('これより、あなたが取り調べを受ける'))}`, 3800);
     await play(clone(R.opening));
     await rvTutorial();
     await play(clone(R.afterBreak));
@@ -934,17 +944,17 @@
   }
   async function rvTutorial() {
     return showOverlayAwait(`<div class="screen card-screen"><div class="help" style="width:min(640px,100%)">
-      <h2>被疑者席</h2>
-      <p>ここからは、あなたが取り調べを受ける。瀬名が「聴き取り」「捜査事実」「揺さぶり」を選び、あなたは五つの応じ方から選ぶ。</p>
+      <h2>${esc(tr('被疑者席'))}</h2>
+      <p>${esc(tr('ここからは、あなたが取り調べを受ける。瀬名が「聴き取り」「捜査事実」「揺さぶり」を選び、あなたは五つの応じ方から選ぶ。'))}</p>
       <ul>
-        <li><b>反発する</b>：突っぱねる。動揺は下がるが、反発が限界まで達すると、かえって消耗する。</li>
-        <li><b>大人しく従う</b>：受け流す。波風は立たないが、懐柔されていく。</li>
-        <li><b>嘘をつく</b>：言い逃れる。瀬名の手札に崩されれば、大きく動揺する。崩されない嘘は、盾にもなる。</li>
-        <li><b>事実を供述する</b>：一部を認める。気は楽になるが、供述が積み上がる。</li>
-        <li><b>全てを自白する</b>：すべてを終わらせる。</li>
+        <li><b>${esc(tr('反発する'))}</b>${esc(tr('：突っぱねる。動揺は下がるが、反発が限界まで達すると、かえって消耗する。'))}</li>
+        <li><b>${esc(tr('大人しく従う'))}</b>${esc(tr('：受け流す。波風は立たないが、懐柔されていく。'))}</li>
+        <li><b>${esc(tr('嘘をつく'))}</b>${esc(tr('：言い逃れる。瀬名の手札に崩されれば、大きく動揺する。崩されない嘘は、盾にもなる。'))}</li>
+        <li><b>${esc(tr('事実を供述する'))}</b>${esc(tr('：一部を認める。気は楽になるが、供述が積み上がる。'))}</li>
+        <li><b>${esc(tr('全てを自白する'))}</b>${esc(tr('：すべてを終わらせる。'))}</li>
       </ul>
-      <p>動揺が「口が滑る」の目盛りを超えるか懐柔が最高値になると、口が勝手に動く。供述が${R.threshold}件に達するか、動揺と懐柔がともに最高値のまま「自白を求める」を受ければ――落ちる。午後10時まで持ちこたえれば、取り調べは終わる。</p>
-      <div class="row" style="display:flex;gap:8px"><button class="btn lamp" type="button" data-go="close">取り調べを受ける</button></div>
+      <p>${esc(tr('動揺が「口が滑る」の目盛りを超えるか懐柔が最高値になると、口が勝手に動く。供述が{n}件に達するか、動揺と懐柔がともに最高値のまま「自白を求める」を受ければ――落ちる。午後10時まで持ちこたえれば、取り調べは終わる。', { n: R.threshold }))}</p>
+      <div class="row" style="display:flex;gap:8px"><button class="btn lamp" type="button" data-go="close">${esc(tr('取り調べを受ける'))}</button></div>
     </div></div>`);
   }
 
@@ -979,11 +989,11 @@
   }
   function rvActLabel(a) {
     switch (a.type) {
-      case 'hear': return { k: '聴き取り', b: qOf(a.q).label, s: a.re ? '同じことを、もう一度聞かれた' : '問いにどう応じる？' };
-      case 'expose': return { k: '捜査事実', b: R.facts.find(f => f.id === a.fact).title, s: `あなたの嘘「${qOf(a.q).lieShort}」を突いてきた` };
-      case 'bluff': return { k: '捜査事実', b: R.facts.find(f => f.id === a.fact).title, s: '「まっすぐ官舎に帰った」は嘘だ、と言う。……本当に矛盾しているか？' };
-      case 'demand': return { k: '揺さぶり', b: '自白を求める', s: a.final ? '最後の追及' : 'あなたが落ちかけていると見ている' };
-      default: return { k: '揺さぶり', b: SHAKES.find(s => s.id === a.type).name, s: '' };
+      case 'hear': return { k: tr('聴き取り'), b: qOf(a.q).label, s: tr(a.re ? '同じことを、もう一度聞かれた' : '問いにどう応じる？') };
+      case 'expose': return { k: tr('捜査事実'), b: R.facts.find(f => f.id === a.fact).title, s: tr('あなたの嘘「{lie}」を突いてきた', { lie: qOf(a.q).lieShort }) };
+      case 'bluff': return { k: tr('捜査事実'), b: R.facts.find(f => f.id === a.fact).title, s: tr('「{lie}」は嘘だ、と言う。……本当に矛盾しているか？', { lie: qOf(a.q).lieShort }) };
+      case 'demand': return { k: tr('揺さぶり'), b: tr('自白を求める'), s: tr(a.final ? '最後の追及' : 'あなたが落ちかけていると見ている') };
+      default: return { k: tr('揺さぶり'), b: tr(SHAKES.find(s => s.id === a.type).name), s: '' };
     }
   }
   function rvPresent(a) {
@@ -998,7 +1008,7 @@
       case 'expose': {
         const f = R.facts.find(x => x.id === a.fact), Q = qOf(a.q);
         if (!rv.used.includes(f.id)) rv.used.push(f.id);
-        const ls = gm.exposeLines(Q.lieShort, f.say || f.text);
+        const ls = gm.exposeLines.map(tpl => S(I18N.fill(tpl, { lie: Q.lieShort, fact: f.say || f.text })));
         ls[0].pov = 'pov_file';
         ls[1].stamp = 'contra';
         return ls;
@@ -1039,14 +1049,15 @@
     rv.told.push(qid); rv.stats.truths++;
     rv.weight += qOf(qid).weight || 1;
     if (rv.lies[qid] && !rv.lies[qid].exposed) rv.lies[qid].retracted = true;
-    return [SYS(`あなたの供述が、調書に記録された。（${Math.min(rv.weight, R.threshold)}/${R.threshold}）`, { sfx: 'stmt', call: () => render() })];
+    return [SYS(tr('あなたの供述が、調書に記録された。（{n}/{m}）', { n: Math.min(rv.weight, R.threshold), m: R.threshold }), { sfx: 'stmt', call: () => render() })];
   }
   function rvNextTruth() {
     const rv = G.rv;
     for (let i = rv.asked.length - 1; i >= 0; i--) if (!rv.told.includes(rv.asked[i])) return rv.asked[i];
     return R.askOrder.find(q => !rv.told.includes(q));
   }
-  const respLine = txt => (txt && txt.startsWith('（') ? N(txt) : K(txt));
+  // （ ）で始まる応答は、口に出さないしぐさ（地の文）
+  const respLine = txt => (txt && /^[（(]/.test(txt) ? N(txt) : K(txt));
 
   async function rvLoop() {
     while (G && isRev() && !G.over) {
@@ -1054,7 +1065,7 @@
       const before = rvKnown().length;
       rv.turn++;
       const gained = rvKnown().length - before;
-      if (gained > 0 && rv.turn > 1) { Sfx.play('report'); toast(`<b>瀬名の手札</b>　新しい資料が${gained}枚、届いた`, 2600); }
+      if (gained > 0 && rv.turn > 1) { Sfx.play('report'); toast(`<b>${esc(tr('瀬名の手札'))}</b>${I18N.gap()}${esc(tr('新しい資料が{n}枚、届いた', { n: gained }))}`, 2600); }
       const a = rvChoose();
       rv.pending = a;
       G.clock = Math.min(R.end, R.start + Math.round((R.end - R.start) * (rv.turn - 1) / R.turns));
@@ -1063,7 +1074,7 @@
       await play(rvPresent(a));
       render();
       const L = rvActLabel(a);
-      idleText(`【瀬名の手：${L.k}】${L.b}　――${L.s || 'どう応じる。'}`);
+      idleText(tr('【瀬名の手：{k}】{b}　――{s}', { k: L.k, b: L.b, s: L.s || tr('どう応じる。') }));
       const choice = await waitResponse();
       rv.pending = null;
       await rvResolve(a, choice);
@@ -1084,7 +1095,7 @@
 
   async function rvResolve(a, choice) {
     const rv = G.rv, E = R.effects, gm = R.gm;
-    if (choice === 'confess') { await play([M('……もう、いい。')]); return endingConfess(); }
+    if (choice === 'confess') { await play([M(tr('……もう、いい。'))]); return endingConfess(); }
     const lines = [];
     let eff = null;
     switch (a.type) {
@@ -1101,14 +1112,14 @@
         const Q = qOf(a.q);
         rv.lies[a.q].exposed = true; rv.stats.exposed++;
         if (choice === 'truth') { lines.push(K(Q.r.truth), ...rvTell(a.q)); }
-        else if (choice === 'comply') { lines.push(N('（言葉が、出なかった。）'), K(Q.r.truth), ...rvTell(a.q)); }
+        else if (choice === 'comply') { lines.push(N(tr('（言葉が、出なかった。）')), K(Q.r.truth), ...rvTell(a.q)); }
         else lines.push(K(gm.exposeReplies[choice]));
         eff = E.expose[choice];
         break;
       }
       case 'bluff': {
         rv.bluffDone = true;
-        if (choice === 'rebel') { lines.push(K(gm.bluffReplies.rebel), SYS('', { stamp: 'nocontra', wait: 700 }), S('…………。')); rv.stats.rebels++; }
+        if (choice === 'rebel') { lines.push(K(gm.bluffReplies.rebel), SYS('', { stamp: 'nocontra', wait: 700 }), S(tr('…………。'))); rv.stats.rebels++; }
         else if (choice === 'truth') { lines.push(K(qOf('Q2').r.truth), ...rvTell('Q2')); }
         else lines.push(respLine(gm.bluffReplies[choice]));
         eff = E.bluff[choice];
@@ -1118,7 +1129,7 @@
         if (rvCond()) {
           const shield = choice !== 'truth' && choice !== 'comply' ? rvShield() : null;
           if (shield) {
-            lines.push(...clone(gm.rebutLines), K(`「${qOf(shield).lieShort}」――それを、まだ崩せていないだろう。`), S('……そうですね。まずは、そこから崩しましょう。'));
+            lines.push(...clone(gm.rebutLines), K(tr('「{lie}」――それを、まだ崩せていないだろう。', { lie: qOf(shield).lieShort })), S(tr('……そうですね。まずは、そこから崩しましょう。')));
             eff = { D: -20, K: -25 };
             break;
           }
@@ -1137,7 +1148,7 @@
       }
       default: {
         const sh = gm.shakes[a.type];
-        if (choice === 'truth') { const q = rvNextTruth(); if (q) lines.push(K(qOf(q).r.truth), ...rvTell(q)); else lines.push(K('……話せることは、もう話した。')); }
+        if (choice === 'truth') { const q = rvNextTruth(); if (q) lines.push(K(qOf(q).r.truth), ...rvTell(q)); else lines.push(K(tr('……話せることは、もう話した。'))); }
         else { lines.push(respLine(sh.r[choice])); if (choice === 'rebel') rv.stats.rebels++; }
         eff = E[a.type][choice];
       }
@@ -1160,15 +1171,15 @@
     if (ui.commands.dataset.mode !== 'resp') {
       ui.commands.dataset.mode = 'resp';
       ui.commands.className = 'responses';
-      ui.commands.innerHTML = RESPONSES.map((r, i) => `<button class="resp ${r.id === 'confess' ? 'confess' : ''}" type="button" data-resp="${r.id}" title="${esc(r.name)}（キー ${i + 1}）"><span class="l">${esc(r.name)}</span><span class="s">${esc(r.short)}</span><small>${esc(r.sub)}</small></button>`).join('');
+      ui.commands.innerHTML = RESPONSES.map((r, i) => `<button class="resp ${r.id === 'confess' ? 'confess' : ''}" type="button" data-resp="${r.id}" title="${esc(tr('{name}（キー {n}）', { name: tr(r.name), n: i + 1 }))}"><span class="l">${esc(tr(r.name))}</span><span class="s">${esc(I18N.trc('short', r.short))}</span><small>${esc(tr(r.sub))}</small></button>`).join('');
     }
     const waiting = !!respResolver && !busy;
     ui.commands.querySelectorAll('.resp').forEach(b => { b.disabled = !waiting; });
   }
   function renderRevPanel() {
     const rv = G.rv;
-    ui.panelTitle.textContent = '瀬名の手';
-    ui.panelSub.textContent = `${rv.turn}手目／全${R.turns}手`;
+    ui.panelTitle.textContent = tr('瀬名の手');
+    ui.panelSub.textContent = tr('{n}手目／全{m}手', { n: rv.turn, m: R.turns });
     let h = '';
     if (rv.pending) {
       const L = rvActLabel(rv.pending);
@@ -1177,15 +1188,15 @@
     const known = rvKnown();
     const shown = known.filter(f => rv.used.includes(f.id));
     const hidden = known.length - shown.length;
-    h += `<div class="sect-title">瀬名の手札（${known.length}）</div>`;
+    h += `<div class="sect-title">${esc(tr('瀬名の手札（{n}）', { n: known.length }))}</div>`;
     h += shown.length ? `<div class="mini">${shown.map(f => `<div class="it"><b>${esc(f.title)}</b>${esc(f.text)}</div>`).join('')}</div>` : '';
-    h += hidden ? `<div class="hand" title="まだ見せていない手札">${'<i class="fc"></i>'.repeat(hidden)}</div><p class="hint">伏せられた手札が ${hidden} 枚。何を握られているかは、わからない。</p>` : '';
+    h += hidden ? `<div class="hand" title="${esc(tr('まだ見せていない手札'))}">${'<i class="fc"></i>'.repeat(hidden)}</div><p class="hint">${esc(tr('伏せられた手札が {n} 枚。何を握られているかは、わからない。', { n: hidden }))}</p>` : '';
     const lies = R.askOrder.filter(q => rv.lies[q]);
-    h += `<div class="sect-title">あなたがついた嘘（${lies.length}）</div>`;
-    h += lies.length ? `<div class="mini">${lies.map(q => { const L = rv.lies[q]; const st = L.exposed ? '<span class="st out">崩された</span>' : L.retracted ? '<span class="st">撤回した</span>' : '<span class="st safe">まだ崩されていない</span>'; return `<div class="it ${L.exposed ? 'bad' : ''}"><b>「${esc(qOf(q).lieShort)}」</b>${st}</div>`; }).join('')}</div>` : '<p class="hint">まだ、嘘はついていない。</p>';
-    h += `<div class="sect-title">あなたの供述（${rv.told.length}）</div>`;
-    h += rv.told.length ? `<div class="mini">${rv.told.map(q => `<div class="it"><b>${esc(qOf(q).label)}</b>${esc(qOf(q).r.truth)}</div>`).join('')}</div>` : '<p class="hint">まだ、何も認めていない。</p>';
-    h += `<div class="sect-title">第三章前半で判明した事実</div><div class="mini">${['F8', 'F9', 'F10'].filter(id => G.facts.includes(id)).map(id => `<div class="it"><b>${esc(fact(id).title)}</b>${esc(fact(id).text)}</div>`).join('')}</div>`;
+    h += `<div class="sect-title">${esc(tr('あなたがついた嘘（{n}）', { n: lies.length }))}</div>`;
+    h += lies.length ? `<div class="mini">${lies.map(q => { const L = rv.lies[q]; const st = L.exposed ? `<span class="st out">${esc(tr('崩された'))}</span>` : L.retracted ? `<span class="st">${esc(tr('撤回した'))}</span>` : `<span class="st safe">${esc(tr('まだ崩されていない'))}</span>`; return `<div class="it ${L.exposed ? 'bad' : ''}"><b>${esc(tr('「{q}」', { q: qOf(q).lieShort }))}</b>${st}</div>`; }).join('')}</div>` : `<p class="hint">${esc(tr('まだ、嘘はついていない。'))}</p>`;
+    h += `<div class="sect-title">${esc(tr('あなたの供述（{n}）', { n: rv.told.length }))}</div>`;
+    h += rv.told.length ? `<div class="mini">${rv.told.map(q => `<div class="it"><b>${esc(qOf(q).label)}</b>${esc(qOf(q).r.truth)}</div>`).join('')}</div>` : `<p class="hint">${esc(tr('まだ、何も認めていない。'))}</p>`;
+    h += `<div class="sect-title">${esc(tr('第三章前半で判明した事実'))}</div><div class="mini">${['F8', 'F9', 'F10'].filter(id => G.facts.includes(id)).map(id => `<div class="it"><b>${esc(fact(id).title)}</b>${esc(fact(id).text)}</div>`).join('')}</div>`;
     ui.panelBody.innerHTML = h;
   }
 
@@ -1197,14 +1208,15 @@
     await play(clone(E.lines));
     Sfx.setWhine(false); ui.glare.classList.remove('on');
     const order = ['Q4', 'Q1', 'Q2', 'Q3', 'Q6', 'Q5', 'Q7'];
+    const me = R.self;
     const html = recordHTML({
-      rows: [{ k: '住居', v: '湊川市港北町 湊川署職員官舎' }, { k: '職業', v: '警察官（湊川警察署刑事課 警部補）' }, { k: '氏名', v: '久我誠' }, { k: '年齢', v: '46歳' }],
-      intro: '上記の者は、令和○年11月18日、湊川警察署において、本職に対し、任意、次のとおり供述した。',
-      items: [...order.map(q => qOf(q).doc), '11月3日午後10時25分ころ、非常階段4階の踊り場で、宮地恭子さんを突き飛ばし、転落させました。'],
-      closing: '以上のとおり録取して読み聞かせたところ、誤りのないことを申し立て、署名指印した。',
-      signer: '久我誠', sign: true,
+      rows: recordRows(me.address, me.job, me.name, me.age),
+      intro: recordIntro(E.record.date),
+      items: [...order.map(q => qOf(q).doc), E.record.final],
+      closing: recordClosing(),
+      signer: I18N.name(me.name), sign: true,
     });
-    await signingScreen(html, '久我誠');
+    await signingScreen(html, I18N.name(me.name));
     enterRoom();
     ui.glare.classList.remove('on'); Sfx.setWhine(false);
     setShot('pov_off');
@@ -1217,7 +1229,7 @@
     const E = DATA.endings.survive;
     ui.glare.classList.remove('on'); Sfx.setWhine(false);
     const lines = clone(E.lines);
-    if (G.rv && G.rv.told.some(q => ['Q1', 'Q2', 'Q3'].includes(q))) lines.splice(3, 0, N('認めたことは、いくつかある。だが、突き飛ばしたとは、最後まで言わなかった。'));
+    if (G.rv && G.rv.told.some(q => ['Q1', 'Q2', 'Q3'].includes(q))) lines.splice(3, 0, N(E.partial));
     await play(lines);
     finishEnding('survive');
   }
@@ -1232,12 +1244,12 @@
     Sfx.play(kind === 'confess' ? 'clear' : 'gameover');
     showOverlay(`<div class="screen endcard"><div class="bg"><img src="${IMG(kind === 'confess' ? 'pov_off' : 'sc_station')}" alt=""></div><div class="inner">
       <h2>${esc(E.title)}</h2>
-      <p>${kind === 'confess' ? '落としの久我は、最後に自分を落とした。' : '落としの久我は、最後まで落ちなかった。'}</p>
-      <p class="stats">ついた嘘 ${rv.stats.lies || 0}　崩された嘘 ${rv.stats.exposed || 0}　認めた事実 ${rv.stats.truths || 0}　反発 ${rv.stats.rebels || 0}</p>
-      <p class="stats">${seenOther ? 'ふたつの結末を、どちらも見届けた。' : `もうひとつの結末がある。第三章を選び直せば、被疑者席からやり直せる。`}</p>
+      <p>${esc(E.epitaph)}</p>
+      <p class="stats">${esc(tr('ついた嘘 {lies}　崩された嘘 {exposed}　認めた事実 {truths}　反発 {rebels}', { lies: rv.stats.lies || 0, exposed: rv.stats.exposed || 0, truths: rv.stats.truths || 0, rebels: rv.stats.rebels || 0 }))}</p>
+      <p class="stats">${esc(tr(seenOther ? 'ふたつの結末を、どちらも見届けた。' : 'もうひとつの結末がある。第三章を選び直せば、被疑者席からやり直せる。'))}</p>
       <div class="row" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
-        <button class="btn lamp" type="button" data-go="ch3">第三章をもう一度</button>
-        <button class="btn" type="button" data-go="title">タイトルへ</button></div>
+        <button class="btn lamp" type="button" data-go="ch3">${esc(tr('第三章をもう一度'))}</button>
+        <button class="btn" type="button" data-go="title">${esc(tr('タイトルへ'))}</button></div>
     </div></div>`);
     G = null;
   }
@@ -1258,6 +1270,7 @@
   }
   function resolveOverlay(v) { if (overlayResolver) { const r = overlayResolver; overlayResolver = null; r(v); return true; } return false; }
 
+  const LOGO = '完落ち<small>取調室・三章</small>'; // i18n-ignore 題字はどの言語でも日本語のまま
   function titleScreen() {
     G = null; busy = false; Sfx.heartbeat(0);
     advanceFn = null; respResolver = null; overlayResolver = null; typing = false;
@@ -1265,21 +1278,29 @@
     ui.app.classList.remove('rev');
     setTop();
     const hasSave = !!(meta.save && meta.save.G);
-    const chapters = DATA.chapters.map((c, i) => `<button class="btn" type="button" data-go="ch${i + 1}" ${i + 1 > meta.unlocked ? 'disabled' : ''}>${esc(c.no)}　${esc(c.title)}</button>`).join('');
-    const ends = meta.endings.length ? `見届けた結末：${meta.endings.map(e => e === 'confess' ? '完落ち' : '黙秘').join('・')}` : '';
+    const chapters = DATA.chapters.map((c, i) => `<button class="btn" type="button" data-go="ch${i + 1}" ${i + 1 > meta.unlocked ? 'disabled' : ''}>${esc(tr('{no}　{title}', { no: c.no, title: c.title }))}</button>`).join('');
+    const ends = meta.endings.length ? tr('見届けた結末：{list}', { list: meta.endings.map(e => DATA.endings[e].name).join(tr('・')) }) : '';
+    // 日本語は縦書きの題字が見出し。ほかの言語では題字は飾りにして、訳した題名を見出しにする
+    const ja = I18N.lang === 'ja';
+    const word = `<${ja ? 'h1' : 'div'} class="title-word"${ja ? '' : ' aria-hidden="true" lang="ja"'}>${LOGO}</${ja ? 'h1' : 'div'}>`;
+    const copy = (ja ? '' : `<h1 class="title-name">${esc(tr('完落ち'))}<small>${esc(tr('取調室・三章'))}</small></h1>`)
+      + `<p class="tag">${esc(tr('その供述は、事実と矛盾している。'))}</p>`
+      + (ja ? '<p class="en">KANOCHI — THREE CASES IN INTERROGATION ROOM 3</p>' : `<p class="gloss">${tr('〔題名の説明〕')}</p>`);
+    const langs = I18N.langs.map(l => `<button class="lang ${l.id === I18N.lang ? 'on' : ''}" type="button" data-go="lang:${l.id}" lang="${l.id}" aria-pressed="${l.id === I18N.lang}">${esc(l.name)}</button>`).join('');
     showOverlay(`<div class="screen title-screen">
       <div class="title-bg"><img src="${IMG('sc_room')}" alt=""></div>
       <div class="title-inner">
-        <h1 class="title-word">完落ち<small>取調室・三章</small></h1>
-        <div class="title-copy"><p class="tag">その供述は、事実と矛盾している。</p><p class="en">KANOCHI — THREE CASES IN INTERROGATION ROOM 3</p></div>
+        ${word}
+        <div class="title-copy">${copy}</div>
         <div class="menu">
-          ${hasSave ? '<button class="btn lamp" type="button" data-go="resume">つづきから</button>' : ''}
-          <button class="btn ${hasSave ? '' : 'lamp'}" type="button" data-go="new">はじめから</button>
+          ${hasSave ? `<button class="btn lamp" type="button" data-go="resume">${esc(tr('つづきから'))}</button>` : ''}
+          <button class="btn ${hasSave ? '' : 'lamp'}" type="button" data-go="new">${esc(tr('はじめから'))}</button>
           <div class="row">${chapters}</div>
-          <div class="row"><button class="btn" type="button" data-go="help">遊び方</button><button class="btn" type="button" data-go="sound">音：${meta.sound ? 'あり' : 'なし'}</button><button class="btn" type="button" data-go="speed">文字：${SPEEDS[meta.speed].label}</button></div>
-          <p class="note">写真はすべて生成画像で、登場する人物・団体・事件は架空のものです。音が鳴ります。${ends ? '<br>' + esc(ends) : ''}</p>
+          <div class="row"><button class="btn" type="button" data-go="help">${esc(tr('遊び方'))}</button><button class="btn" type="button" data-go="sound">${esc(soundLabel())}</button><button class="btn" type="button" data-go="speed" data-tpl="文字：{v}">${esc(speedLabel('文字：{v}'))}</button></div>
+          <p class="note">${esc(tr('写真はすべて生成画像で、登場する人物・団体・事件は架空のものです。音が鳴ります。'))}${ends ? '<br>' + esc(ends) : ''}</p>
         </div>
-      </div></div>`);
+      </div>
+      <div class="langs" role="group" aria-label="Language / 言語">${langs}</div></div>`);
   }
 
   async function chapterCard(ci) {
@@ -1288,14 +1309,14 @@
       const v = await showOverlayAwait(`<div class="screen card-screen"><div class="chapter-card">
       <div class="pic"><img src="${IMG(ch.scene)}" alt=""><div class="vt"><small>${esc(ch.no)}</small>${esc(ch.title)}</div></div>
       <div class="body">
-        <div><div class="date">${esc(ch.dateLabel)}　取調べ開始 ${fmt(ch.start)}${ch.innocent ? '' : `／終了 ${fmt(ch.end)}`}</div><div class="case">${esc(ch.caseName)}</div></div>
+        <div><div class="date">${esc(tr('{date}　取調べ開始 {start}', { date: ch.dateLabel, start: fmt(ch.start) }) + (ch.innocent ? '' : tr('／終了 {end}', { end: fmt(ch.end) })))}</div><div class="case">${esc(ch.caseName)}</div></div>
         <p class="sum">${esc(ch.summary)}</p>
         <div class="profile"><img src="${THUMB(s.img.neutral)}" alt="">
-          <div><div class="pn">${esc(s.name)}<small>${esc(s.ruby)}</small></div><div class="pm">${s.age}歳　${esc(s.job)}</div>
+          <div><div class="pn">${esc(s.name)}${s.ruby ? `<small>${esc(s.ruby)}</small>` : ''}</div><div class="pm">${esc(tr('{age}歳　{job}', { age: s.age, job: s.job }))}</div>
           <div class="pt"><b>${esc(s.type)}</b>${esc(s.typeNote)}</div></div></div>
-        <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn lamp" type="button" data-go="close">取り調べを始める</button><button class="btn" type="button" data-go="cardhelp">遊び方</button></div>
+        <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn lamp" type="button" data-go="close">${esc(tr('取り調べを始める'))}</button><button class="btn" type="button" data-go="cardhelp">${esc(tr('遊び方'))}</button></div>
       </div></div></div>`);
-      if (v === 'cardhelp') { await showOverlayAwait(helpHTML('close', '事件の概要に戻る')); continue; }
+      if (v === 'cardhelp') { await showOverlayAwait(helpHTML('close', tr('事件の概要に戻る'))); continue; }
       return;
     }
   }
@@ -1305,36 +1326,37 @@
     const used = G.clock - ch.start;
     const next = G.ci + 1 < DATA.chapters.length;
     showOverlay(`<div class="screen card-screen"><div class="result">
-      <span class="big-stamp">完落ち</span>
+      <span class="big-stamp">${esc(I18N.trc('stamp', '完落ち'))}</span>
       <h2>${esc(ch.no)}</h2>
-      <p class="lead">${esc(ch.title)}――${esc(SUS().name)}は、すべてを認めた。</p>
+      <p class="lead">${esc(tr('{title}――{name}は、すべてを認めた。', { title: ch.title, name: SUS().name }))}</p>
       <dl>
-        <dt>取り調べの時間</dt><dd>${Math.floor(used / 60)}時間${used % 60}分</dd>
-        <dt>得た供述</dt><dd>${G.stmts.length}件</dd>
-        <dt>指摘した矛盾</dt><dd>${st.contra}件</dd>
-        <dt>的外れの指摘</dt><dd>${st.wrong}件</dd>
-        <dt>嘘を盾に反論された</dt><dd>${st.rebut}回</dd>
-        <dt>揺さぶり</dt><dd>${st.shakes}回</dd>
-        <dt>出したカツ丼</dt><dd>${st.katsudon}杯</dd>
+        <dt>${esc(tr('取り調べの時間'))}</dt><dd>${esc(tr('{h}時間{m}分', { h: Math.floor(used / 60), m: used % 60 }))}</dd>
+        <dt>${esc(tr('得た供述'))}</dt><dd>${esc(tr('{n}件', { n: G.stmts.length }))}</dd>
+        <dt>${esc(tr('指摘した矛盾'))}</dt><dd>${esc(tr('{n}件', { n: st.contra }))}</dd>
+        <dt>${esc(tr('的外れの指摘'))}</dt><dd>${esc(tr('{n}件', { n: st.wrong }))}</dd>
+        <dt>${esc(tr('嘘を盾に反論された'))}</dt><dd>${esc(tr('{n}回', { n: st.rebut }))}</dd>
+        <dt>${esc(I18N.trc('stat', '揺さぶり'))}</dt><dd>${esc(tr('{n}回', { n: st.shakes }))}</dd>
+        <dt>${esc(tr('出したカツ丼'))}</dt><dd>${esc(tr('{n}杯', { n: st.katsudon }))}</dd>
       </dl>
-      <div class="row">${next ? `<button class="btn primary" type="button" data-go="next">${esc(DATA.chapters[G.ci + 1].no)}へ</button>` : ''}<button class="btn" type="button" data-go="title">タイトルへ</button></div>
+      <div class="row">${next ? `<button class="btn primary" type="button" data-go="next">${esc(tr('{no}へ', { no: DATA.chapters[G.ci + 1].no }))}</button>` : ''}<button class="btn" type="button" data-go="title">${esc(tr('タイトルへ'))}</button></div>
     </div></div>`);
   }
 
   async function signingScreen(html, signer) {
     Sfx.heartbeat(0);
     showOverlay(`<div class="screen doc-screen"><div class="doc">
-      <div class="bar"><span>供述調書の読み聞かせ</span><span>右から左へ読む</span></div>${html}
-      <div class="bar"><span id="signNote">署名ののち、指印を押す。</span><button class="btn primary" type="button" data-go="close" id="signBtn" disabled>指印を押す</button></div></div></div>`);
+      <div class="bar"><span>${esc(tr('供述調書の読み聞かせ'))}</span><span>${esc(tr('右から左へ読む'))}</span></div>${html}
+      <div class="bar"><span id="signNote">${esc(tr('署名ののち、指印を押す。'))}</span><button class="btn primary" type="button" data-go="close" id="signBtn" disabled>${esc(tr('指印を押す'))}</button></div></div></div>`);
     const wrap = ui.overlay.querySelector('.record-wrap');
-    if (wrap) { wrap.scrollLeft = wrap.scrollWidth; await sleep(400); }
+    const vert = isVertical(wrap && wrap.firstElementChild);
+    if (wrap) { if (vert) wrap.scrollLeft = wrap.scrollWidth; else wrap.scrollTop = 0; await sleep(400); }
     const btn = $('#signBtn');
     btn.disabled = false; btn.focus();
     await new Promise(r => { overlayResolver = r; });
     const slot = $('#fpSlot');
     if (slot) { slot.innerHTML = fingerprintSVG(); Sfx.play('fingerprint'); }
-    if (wrap) wrap.scrollTo({ left: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
-    btn.textContent = '次へ'; $('#signNote').textContent = `${signer}――署名指印。`;
+    if (wrap) wrap.scrollTo(vert ? { left: 0, behavior: reduceMotion ? 'auto' : 'smooth' } : { top: wrap.scrollHeight, behavior: reduceMotion ? 'auto' : 'smooth' });
+    btn.textContent = tr('次へ'); $('#signNote').textContent = tr('{name}――署名指印。', { name: signer });
     await new Promise(r => { overlayResolver = r; });
     ui.overlay.hidden = true; ui.overlay.innerHTML = '';
   }
@@ -1344,52 +1366,52 @@
       const rx = 4 + i * 1.6, ry = 6 + i * 2;
       p += `<ellipse cx="19" cy="24" rx="${rx}" ry="${ry}" fill="none" stroke="#b5302a" stroke-width="1.1" stroke-dasharray="${6 + (i % 3) * 3} ${1.5 + (i % 2)}" opacity="${0.9 - i * 0.03}"/>`;
     }
-    return `<svg class="fingerprint" viewBox="0 0 38 46" aria-label="指印"><g transform="rotate(-8 19 23)">${p}</g></svg>`;
+    return `<svg class="fingerprint" viewBox="0 0 38 46" aria-label="${esc(tr('指印'))}"><g transform="rotate(-8 19 23)">${p}</g></svg>`;
   }
 
   function helpHTML(go, label) {
     return `<div class="screen card-screen"><div class="help">
-      <h2>遊び方</h2>
-      <p>あなたは湊川警察署の刑事・久我。取調室で被疑者を追い詰め、「完落ち」――すべてを自白させる。全三章。</p>
+      <h2>${esc(tr('遊び方'))}</h2>
+      <p>${esc(tr('あなたは湊川警察署の刑事・久我。取調室で被疑者を追い詰め、「完落ち」――すべてを自白させる。全三章。'))}</p>
       <div class="two">
-        <div><h3>四つのコマンド</h3><ul>
-          <li><b>聴き取り</b>：テーマを選んで言い分を聞く。答えは「聴取メモ」に残る。反発と動揺が上がる。</li>
-          <li><b>捜査事実</b>：「判明した事実」を選び、次に聴取メモを選んで矛盾を突く。当たれば「矛盾」の判が押され、動揺が大きく上がり、供述が取れる。</li>
-          <li><b>揺さぶり</b>：ライト、机、お茶、カツ丼、共犯者、親への連絡、そして自白を求める。</li>
-          <li><b>供述調書</b>：得た供述の記録。</li></ul></div>
-        <div><h3>二つのゲージ</h3><ul>
-          <li><b>動揺</b>：赤い「自供」の目盛りを超えると、相手のほうから話し始める。</li>
-          <li><b>懐柔／反発</b>：「本音」の目盛りより右で同じテーマを聞き直すと、本音が出る。最大まで懐柔しても、相手から話し始める。反発しきると黙秘されることがある。</li>
-          <li>斜線は届かない範囲。初期値・増え方・上限下限は、被疑者のタイプで違う。</li></ul></div>
+        <div><h3>${esc(tr('四つのコマンド'))}</h3><ul>
+          <li><b>${esc(tr('聴き取り'))}</b>${esc(tr('：テーマを選んで言い分を聞く。答えは「聴取メモ」に残る。反発と動揺が上がる。'))}</li>
+          <li><b>${esc(tr('捜査事実'))}</b>${esc(tr('：「判明した事実」を選び、次に聴取メモを選んで矛盾を突く。当たれば「矛盾」の判が押され、動揺が大きく上がり、供述が取れる。'))}</li>
+          <li><b>${esc(tr('揺さぶり'))}</b>${esc(tr('：ライト、机、お茶、カツ丼、共犯者、親への連絡、そして自白を求める。'))}</li>
+          <li><b>${esc(tr('供述調書'))}</b>${esc(tr('：得た供述の記録。'))}</li></ul></div>
+        <div><h3>${esc(tr('二つのゲージ'))}</h3><ul>
+          <li><b>${esc(tr('動揺'))}</b>${esc(tr('：赤い「自供」の目盛りを超えると、相手のほうから話し始める。'))}</li>
+          <li><b>${esc(tr('懐柔／反発'))}</b>${esc(tr('：「本音」の目盛りより右で同じテーマを聞き直すと、本音が出る。最大まで懐柔しても、相手から話し始める。反発しきると黙秘されることがある。'))}</li>
+          <li>${esc(tr('斜線は届かない範囲。初期値・増え方・上限下限は、被疑者のタイプで違う。'))}</li></ul></div>
       </div>
-      <h3>完落ちの条件</h3>
-      <p>供述が規定の件数に達するか、動揺と懐柔がともに最高値のときに「自白を求める」。ただし、事実と食い違う嘘を潰し残していると、それを盾に反論され、動揺が大きく下がり反発が大きく上がる。矛盾していない供述を「矛盾だ」と突いたときも同じだ。</p>
-      <h3>時間</h3>
-      <p>行動ごとに時計が進む。取り調べは午後9時まで。捜査の進展で、途中から新しい事実が届く。</p>
-      <p style="font-size:12px;color:#958f83">操作：画面か会話欄をクリック／<kbd>Space</kbd><kbd>Enter</kbd>で会話を送る（<kbd>S</kbd>か「≫ 送る」でまとめて送る）。<kbd>1</kbd>〜<kbd>4</kbd>でコマンド、被疑者席では<kbd>1</kbd>〜<kbd>5</kbd>で応答。<kbd>Esc</kbd>で閉じる。</p>
+      <h3>${esc(tr('完落ちの条件'))}</h3>
+      <p>${esc(tr('供述が規定の件数に達するか、動揺と懐柔がともに最高値のときに「自白を求める」。ただし、事実と食い違う嘘を潰し残していると、それを盾に反論され、動揺が大きく下がり反発が大きく上がる。矛盾していない供述を「矛盾だ」と突いたときも同じだ。'))}</p>
+      <h3>${esc(tr('時間'))}</h3>
+      <p>${esc(tr('行動ごとに時計が進む。取り調べは午後9時まで。捜査の進展で、途中から新しい事実が届く。'))}</p>
+      <p style="font-size:12px;color:#958f83">${tr('操作：画面か会話欄をクリック／<kbd>Space</kbd><kbd>Enter</kbd>で会話を送る（<kbd>S</kbd>か「≫ 送る」でまとめて送る）。<kbd>1</kbd>〜<kbd>4</kbd>でコマンド、被疑者席では<kbd>1</kbd>〜<kbd>5</kbd>で応答。<kbd>Esc</kbd>で閉じる。')}</p>
       <div style="display:flex;gap:8px"><button class="btn lamp" type="button" data-go="${go}">${esc(label)}</button></div>
     </div></div>`;
   }
   function showHelp(awaitIt) {
-    if (G) return showOverlayAwait(helpHTML('close', '取り調べに戻る'), { solid: false });
-    showOverlay(helpHTML('title', 'タイトルへ'));
+    if (G) return showOverlayAwait(helpHTML('close', tr('取り調べに戻る')), { solid: false });
+    showOverlay(helpHTML('title', tr('タイトルへ')));
   }
   function showLog() {
-    const rows = logLines.slice(-160).map(l => `<div class="ln ${l.s}">${l.who ? `<b>${esc(l.who)}</b>` : ''}${esc(l.t)}</div>`).join('') || '<p class="hint">まだ、会話はない。</p>';
-    return showOverlayAwait(`<div class="screen card-screen"><div class="log"><div class="panel-head"><h2>会話の履歴</h2><button class="iconbtn x" type="button" data-go="close" style="margin-left:auto">閉じる</button></div><div class="panel-body" id="logBody">${rows}</div></div></div>`, { solid: false })
+    const rows = logLines.slice(-160).map(l => `<div class="ln ${l.s}">${l.who ? `<b>${esc(l.who)}</b>` : ''}${esc(l.t)}</div>`).join('') || `<p class="hint">${esc(tr('まだ、会話はない。'))}</p>`;
+    return showOverlayAwait(`<div class="screen card-screen"><div class="log"><div class="panel-head"><h2>${esc(tr('会話の履歴'))}</h2><button class="iconbtn x" type="button" data-go="close" style="margin-left:auto">${esc(tr('閉じる'))}</button></div><div class="panel-body" id="logBody">${rows}</div></div></div>`, { solid: false })
       .then(() => {});
   }
   function showMenu() {
     if (!G) return titleScreen();
     return showOverlayAwait(`<div class="screen card-screen"><div class="help" style="width:min(420px,100%)">
-      <h2>中断</h2><p>進み具合は、このブラウザに記録されている。</p>
+      <h2>${esc(tr('中断'))}</h2><p>${esc(tr('進み具合は、このブラウザに記録されている。'))}</p>
       <div style="display:grid;gap:8px">
-        <button class="btn lamp" type="button" data-go="close">取り調べに戻る</button>
-        <button class="btn" type="button" data-go="menuhelp">遊び方</button>
-        <button class="btn" type="button" data-go="menulog">会話の履歴</button>
-        <button class="btn" type="button" data-go="speed">文字の速さ：${SPEEDS[meta.speed].label}</button>
-        <button class="btn" type="button" data-go="sound">音：${meta.sound ? 'あり' : 'なし'}</button>
-        <button class="btn" type="button" data-go="title">タイトルへ戻る</button></div></div></div>`, { solid: false });
+        <button class="btn lamp" type="button" data-go="close">${esc(tr('取り調べに戻る'))}</button>
+        <button class="btn" type="button" data-go="menuhelp">${esc(tr('遊び方'))}</button>
+        <button class="btn" type="button" data-go="menulog">${esc(tr('会話の履歴'))}</button>
+        <button class="btn" type="button" data-go="speed" data-tpl="文字の速さ：{v}">${esc(speedLabel('文字の速さ：{v}'))}</button>
+        <button class="btn" type="button" data-go="sound">${esc(soundLabel())}</button>
+        <button class="btn" type="button" data-go="title">${esc(tr('タイトルへ戻る'))}</button></div></div></div>`, { solid: false });
   }
 
   /* ───────────── 再開 ───────────── */
@@ -1397,16 +1419,20 @@
     const sv = meta.save; if (!sv || !sv.G) return startChapter(0);
     G = sv.G; panelKind = sv.panelKind || 'hear';
     G.over = false;
+    // 古い記録：撤回済みのカードに文字列で残していた内容を、供述の番号に置き換える
+    if (G.phase !== 'rev') for (const [tid, c] of Object.entries(G.cards)) {
+      if (c.admitted && !c.by) { const by = CH().statements.find(s => s.retracts === tid && G.stmts.includes(s.id)); if (by) { c.by = by.id; delete c.admitted; } }
+    }
     preloadChapter(G.ci);
     enterRoom();
     if (isRev()) {
       setShot('pov_sit'); buildMeters(); render();
-      idleText('――取り調べが、再開された。');
+      idleText(tr('――取り調べが、再開された。'));
       if (G.rv.pending) G.rv.turn = Math.max(0, G.rv.turn - 1);
       rvLoop();
     } else {
       setShot(exprImg(moodKey())); buildMeters(); render();
-      idleText(`――取り調べを再開する。${fmt(G.clock)}。`);
+      idleText(tr('――取り調べを再開する。{time}。', { time: fmt(G.clock) }));
     }
   }
 
@@ -1424,7 +1450,7 @@
       pick = { fact: t.dataset.fact, topic: null };
       G.freshFacts = G.freshFacts.filter(x => x !== t.dataset.fact);
       const f = fact(t.dataset.fact);
-      if (f && f.img) showInsert(f.img, { tag: `捜査事実：${f.title}`, hold: true }); else hideInsert();
+      if (f && f.img) showInsert(f.img, { tag: tr('捜査事実：{title}', { title: f.title }), hold: true }); else hideInsert();
       Sfx.play('ui'); renderPanel(); ui.panelBody.scrollTop = 0; return;
     }
     if (t.dataset.topic && !busy) { pick.topic = t.dataset.topic; Sfx.play('ui'); renderPanel(); const bar = ui.panelBody.querySelector('.pairbar'); if (bar) bar.scrollIntoView({ block: 'nearest' }); return; }
@@ -1439,11 +1465,23 @@
     if (t.id === 'btnMenu') return showMenu();
     if (t.id === 'btnHand') { ui.panel.classList.toggle('open'); return; }
   });
+  const soundLabel = () => tr('音：{v}', { v: tr(meta.sound ? 'あり' : 'なし') });
+  const speedLabel = tpl => tr(tpl, { v: tr(SPEEDS[meta.speed].label) });
   function toggleSound() {
     meta.sound = !meta.sound; saveMeta();
     Sfx.init(); Sfx.setOn(meta.sound);
-    $('#btnSound').textContent = meta.sound ? '音' : '無音';
-    toast(meta.sound ? '音：あり' : '音：なし', 1200);
+    $('#btnSound').textContent = tr(meta.sound ? '音' : '無音');
+    toast(esc(soundLabel()), 1200);
+  }
+  // 言語を切り替える。save のときは選んだ言語を記録に残す（自動判定のときは残さない）
+  function useLang(id, { save } = {}) {
+    I18N.set(id);
+    DATA = I18N.data(SRC); R = DATA.reversal;
+    if (save) { meta.lang = I18N.lang; saveMeta(); }
+    I18N.applyDom();
+    document.title = tr('完落ち ― 取調室・三章');
+    ui.commands.dataset.mode = '';
+    $('#btnSound').textContent = tr(meta.sound ? '音' : '無音');
   }
   function onGo(go, btn) {
     Sfx.init(); Sfx.play('ui');
@@ -1461,9 +1499,10 @@
       case 'retry': return startChapter(G.ci);
       case 'title': overlayResolver = null; if (G && !G.over) saveProgress(); return titleScreen();
       case 'help': return showHelp(false);
-      case 'sound': toggleSound(); btn.textContent = `音：${meta.sound ? 'あり' : 'なし'}`; return;
-      case 'speed': meta.speed = (meta.speed + 1) % SPEEDS.length; saveMeta(); btn.textContent = btn.textContent.replace(/：.*/, '：' + SPEEDS[meta.speed].label); return;
+      case 'sound': toggleSound(); btn.textContent = soundLabel(); return;
+      case 'speed': meta.speed = (meta.speed + 1) % SPEEDS.length; saveMeta(); btn.textContent = speedLabel(btn.dataset.tpl || '文字：{v}'); return;
     }
+    if (go.startsWith('lang:')) { useLang(go.slice(5), { save: true }); titleScreen(); }
   }
   document.addEventListener('keydown', e => {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
@@ -1487,9 +1526,10 @@
 
   /* ───────────── 起動 ───────────── */
   Sfx.on = meta.sound;
-  $('#btnSound').textContent = meta.sound ? '音' : '無音';
+  const urlLang = new URLSearchParams(location.search).get('lang');
+  useLang(I18N.pick({ url: urlLang, saved: meta.lang, nav: navigator.languages || [navigator.language] }), { save: !!urlLang && I18N.has(urlLang) });
   idleText('');
   titleScreen();
   // 自動テスト用の窓口（ゲームの進行には使わない）
-  window.__kanochi = { get G() { return G; }, get busy() { return busy; }, log: logLines, meta, DATA, advance: onAdvance, respond: onResponse, startChapter, doHear: id => act(() => doHear(id)), doPoint: (f, t) => act(() => doPoint(f, t)), doShake: k => act(() => doShake(k)) };
+  window.__kanochi = { get G() { return G; }, get busy() { return busy; }, get DATA() { return DATA; }, get lang() { return I18N.lang; }, setLang: id => { useLang(id, { save: true }); titleScreen(); }, log: logLines, meta, advance: onAdvance, respond: onResponse, startChapter, doHear: id => act(() => doHear(id)), doPoint: (f, t) => act(() => doPoint(f, t)), doShake: k => act(() => doShake(k)) };
 })();
