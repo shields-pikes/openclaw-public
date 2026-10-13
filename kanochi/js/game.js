@@ -1526,8 +1526,10 @@
 
   /* ───────────── 起動 ───────────── */
   Sfx.on = meta.sound;
+  // ?lang= で開いたときはその言語を記録する。英語の入口 en/ のように <html data-lang> で言語が決まっているページは、記録せずにその言語で開く
   const urlLang = new URLSearchParams(location.search).get('lang');
-  useLang(I18N.pick({ url: urlLang, saved: meta.lang, nav: navigator.languages || [navigator.language] }), { save: !!urlLang && I18N.has(urlLang) });
+  const pageLang = document.documentElement.dataset.lang;
+  useLang(I18N.pick({ url: urlLang || pageLang, saved: meta.lang, nav: navigator.languages || [navigator.language] }), { save: !!urlLang && I18N.has(urlLang) });
   idleText('');
   titleScreen();
   // 自動テスト用の窓口（ゲームの進行には使わない）
